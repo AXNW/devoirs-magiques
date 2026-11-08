@@ -1,0 +1,10 @@
+{
+  "name": "devoirs-magiques",
+  "private": true,
+  "type": "module",
+  "description": "L'École des Chats Sorciers — aide aux devoirs ludique (aucune dépendance)",
+  "scripts": {
+    "test": "node tests/tests.js",
+    "start": "python3 -m http.server 8000"
+  }
+}

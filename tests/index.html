@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tests – Chats Sorciers</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; background: Canvas; color: CanvasText; }
+    li { margin: .3em 0; }
+    .ko { color: #d33; }
+  </style>
+</head>
+<body>
+  <h1>Tests</h1>
+  <p id="summary">…</p>
+  <ul id="list"></ul>
+  <script type="module">
+    import { runAll } from './tests.js';
+    const results = runAll();
+    const list = document.getElementById('list');
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.textContent = `${r.ok ? '✅' : '❌'} ${r.name}${r.ok ? '' : ' — ' + r.error}`;
+      if (!r.ok) li.className = 'ko';
+      list.append(li);
+    }
+    const failed = results.filter((r) => !r.ok).length;
+    document.getElementById('summary').textContent = `${results.length - failed} / ${results.length} tests OK`;
+  </script>
+</body>
+</html>

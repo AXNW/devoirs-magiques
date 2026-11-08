@@ -1,0 +1,75 @@
+/* Thème « nuit magique ». Changer de thème = changer ces variables. */
+:root {
+  --night: #1b1035;
+  --night-2: #2a1a52;
+  --violet: #6c3fc5;
+  --violet-light: #9b6dff;
+  --gold: #ffcf4a;
+  --gold-dark: #d99a00;
+  --mint: #4ee1a0;
+  --pink: #ff7eb6;
+  --sky-blue: #6ec8ff;
+  --text: #fff8e7;
+  --muted: #cbbdf0;
+  --card: rgba(255, 255, 255, 0.08);
+  --card-border: rgba(255, 255, 255, 0.16);
+  --cat: #3b3060;
+  --radius: 24px;
+  --font: 'Fredoka', 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-height: 100%; }
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: radial-gradient(ellipse at 20% 0%, #4b2a8f 0%, transparent 55%),
+              radial-gradient(ellipse at 90% 100%, #23306e 0%, transparent 50%),
+              linear-gradient(180deg, var(--night-2), var(--night));
+  background-color: var(--night);
+  background-attachment: fixed;
+  font-size: 18px;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+.sky {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image:
+    radial-gradient(2px 2px at 10% 20%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 30% 70%, #fff, transparent),
+    radial-gradient(2px 2px at 55% 15%, #ffe9a8, transparent),
+    radial-gradient(1px 1px at 70% 45%, #fff, transparent),
+    radial-gradient(2px 2px at 85% 25%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 92% 75%, #ffe9a8, transparent),
+    radial-gradient(1px 1px at 40% 90%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 15% 85%, #fff, transparent),
+    radial-gradient(1px 1px at 63% 60%, #fff, transparent),
+    radial-gradient(2px 2px at 5% 50%, #ffe9a8, transparent);
+  animation: twinkle 6s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
+
+h1, h2, h3 { margin: 0 0 .4em; font-weight: 700; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.2rem; }
+p { margin: .3em 0; }
+
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+.block { display: block; }
+.hidden { display: none; }
+
+button { font-family: inherit; }
+:focus-visible { outline: 4px solid var(--sky-blue); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
