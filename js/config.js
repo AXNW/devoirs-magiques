@@ -13,6 +13,9 @@ export const DEFAULT_SETTINGS = {
   masteryToUnlock: 80,      // % des calculs du niveau « sus » pour débloquer le suivant
   dailyPauseHint: 3,        // le chat propose une pause tous les N exercices (0 = jamais)
   dailyLimit: 0,            // nombre maximum d'exercices par jour (0 = illimité)
+  voiceEnabled: true,       // boutons 🔊 de lecture à voix haute
+  voiceName: '',            // voix choisie ('' = la plus naturelle disponible)
+  voiceRate: 0.95,          // vitesse de lecture
 };
 
 // Personnalisation du chat (pelage, yeux). `whisker` = couleur des moustaches lisible sur ce pelage.

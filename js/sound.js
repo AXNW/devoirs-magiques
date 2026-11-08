@@ -64,35 +64,84 @@ export function play(name, { combo = 0 } = {}) {
 }
 
 // ---- Lecture à voix haute (synthèse vocale du navigateur) -----------------
+// La qualité dépend des voix installées. On choisit automatiquement la plus naturelle :
+// voix « Natural / Online » d'Edge, puis « Google français » de Chrome, puis les voix système.
 
+const hasSynth = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
+let voices = [];
+
+function loadVoices() {
+  voices = window.speechSynthesis.getVoices();
+}
+if (hasSynth()) {
+  loadVoices();
+  // Les voix arrivent souvent après le chargement de la page.
+  window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+}
+
+export function voiceScore(v) {
+  const name = v.name.toLowerCase();
+  let score = 0;
+  if (/natural|neural|naturelle/.test(name)) score += 100;
+  if (/online/.test(name)) score += 40;
+  if (/google/.test(name)) score += 50;
+  if (/premium|enhanced|améliorée/.test(name)) score += 30;
+  if (/^fr[-_]fr/i.test(v.lang)) score += 10;
+  if (v.localService === false) score += 5;
+  return score;
+}
+
+// Voix françaises, de la plus naturelle à la plus robotique.
+export function frenchVoices() {
+  return voices.filter((v) => /^fr/i.test(v.lang)).sort((a, b) => voiceScore(b) - voiceScore(a));
+}
+
+export function onVoicesChanged(fn) {
+  if (hasSynth()) window.speechSynthesis.addEventListener?.('voiceschanged', fn);
+  return () => window.speechSynthesis?.removeEventListener?.('voiceschanged', fn);
+}
+
+function chosenVoice() {
+  const wanted = getState().settings.voiceName;
+  const list = frenchVoices();
+  return list.find((v) => v.name === wanted) ?? list[0] ?? null;
+}
+
+// Les boutons 🔊 s'affichent si le navigateur sait parler et que la voix n'est pas désactivée.
 export function canSpeak() {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+  return hasSynth() && getState().settings.voiceEnabled !== false;
 }
 
-function frenchVoice() {
-  const voices = window.speechSynthesis.getVoices();
-  return voices.find((v) => /^fr(-|_)FR/i.test(v.lang)) ?? voices.find((v) => /^fr/i.test(v.lang)) ?? null;
-}
-
-// Toujours déclenchée par un clic de l'enfant : elle fonctionne même si les sons sont coupés.
-export function speak(text) {
-  if (!canSpeak() || !text) return;
+function say(text) {
+  if (!hasSynth() || !text) return;
   const clean = text
-    .replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, '')
+    .replace(/\p{Extended_Pictographic}|️|‍/gu, '')
     .replace(/\+/g, ' plus ')
     .replace(/×/g, ' fois ')
     .replace(/=/g, ' égale ')
-    .replace(/½/g, ' une demie ');
+    .replace(/½/g, ' une demie ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const u = new SpeechSynthesisUtterance(clean);
-  u.lang = 'fr-FR';
-  u.rate = 0.9;
-  u.pitch = 1.1;
-  const voice = frenchVoice();
+  const voice = chosenVoice();
   if (voice) u.voice = voice;
+  u.lang = voice?.lang ?? 'fr-FR';
+  u.rate = Number(getState().settings.voiceRate) || 1;
+  u.pitch = 1; // une hauteur modifiée rend les voix plus artificielles
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
 
+// Toujours déclenchée par un clic de l'enfant : elle fonctionne même si les sons sont coupés.
+export function speak(text) {
+  if (canSpeak()) say(text);
+}
+
+// Pour le bouton « Tester » de l'Espace parent (même si la voix est désactivée).
+export function testVoice() {
+  say('Bonjour ! Je suis ton chat sorcier. Combien font 3 plus 4 ?');
+}
+
 export function stopSpeaking() {
-  if (canSpeak()) window.speechSynthesis.cancel();
+  if (hasSynth()) window.speechSynthesis.cancel();
 }

@@ -6,6 +6,7 @@ import { digitFromKeyEvent } from '../js/screens/exercise.js';
 import mystery, { toMystery } from '../js/activities/mystery.js';
 import problems, { STORIES } from '../js/activities/problems.js';
 import { ACTIVITIES } from '../js/activities/registry.js';
+import { voiceScore } from '../js/sound.js';
 import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, applyChoice, isMastered, levelMastery, levelProgress, dailyLimitReached, recommendedActivity } from '../js/rewards.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
@@ -366,6 +367,14 @@ test('bouton Jouer : dernière activité jouée, sinon la première', () => {
   eq(recommendedActivity(s, [addition, other]).id, 'autre');
   s.history.push({ activity: 'disparue', level: 1 });
   eq(recommendedActivity(s, [addition, other]).id, 'autre');
+});
+
+test('voix : les voix naturelles passent avant les voix système', () => {
+  const natural = { name: 'Microsoft Denise Online (Natural) - French (France)', lang: 'fr-FR', localService: false };
+  const google = { name: 'Google français', lang: 'fr-FR', localService: false };
+  const robot = { name: 'Microsoft Hortense - French (France)', lang: 'fr-FR', localService: true };
+  const list = [robot, google, natural].sort((a, b) => voiceScore(b) - voiceScore(a));
+  eq(list.map((v) => v.name.split(' ')[1]).join(','), 'Denise,français,Hortense');
 });
 
 // ---- Sauvegarde ----

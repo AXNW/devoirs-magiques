@@ -419,3 +419,5 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--gold); }
 .pic-plus { font-weight: 700; color: var(--gold); }
 .problem-answer { font-size: 1.6rem; display: flex; align-items: center; gap: .3em; flex-wrap: wrap; justify-content: center; }
 .problem-answer .q-answer { font-size: 2.6rem; }
+
+.voice-select { max-width: 100%; }
