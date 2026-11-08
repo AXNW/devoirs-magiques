@@ -1,6 +1,6 @@
 // Moteur d'exercice GÉNÉRIQUE : il fonctionne avec n'importe quelle activité
 // qui respecte le contrat (generate / check / renderHelp, et en option
-// levelFacts / diagnose / renderHint / speak / renderGrimoire).
+// levelFacts / diagnose / renderHint / speak / renderGrimoire / renderQuestion).
 
 import { h, clear, showModal, pick, toast } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
@@ -62,9 +62,9 @@ export function render(root, ctx) {
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
 
   // ---- Interface ----
-  const progress = createProgress(count);
-  const talk = createTalkingMascot({ size: 110, hatColor: rankInfo(state.wallet.totalStars).rank.hat });
-  const promptEl = h('span', { class: 'q-prompt' });
+  const hatColor = rankInfo(state.wallet.totalStars).rank.hat;
+  const progress = createProgress(count, { hatColor });
+  const talk = createTalkingMascot({ size: 110, hatColor });
   const answerEl = h('span', { class: 'q-answer', 'aria-live': 'polite' });
   const listenBtn = canSpeak()
     ? h('button', {
@@ -72,7 +72,7 @@ export function render(root, ctx) {
       onClick: (e) => { e.currentTarget.blur(); const q = questions[index]; speak(activity.speak?.(q) ?? q.prompt); },
     }, '🔊')
     : null;
-  const questionEl = h('div', { class: 'question' }, promptEl, h('span', { class: 'q-eq' }, '='), answerEl);
+  const questionEl = h('div', { class: 'question' });
   const feedbackEl = h('div', { class: 'feedback', 'aria-live': 'polite' });
   const helpEl = h('div', { class: 'help-zone' });
   const numpad = createNumpad({ onDigit: addDigit, onDelete: removeDigit, onSubmit: submit });
@@ -95,14 +95,19 @@ export function render(root, ctx) {
 
   function showQuestion() {
     const q = questions[index];
-    promptEl.textContent = q.prompt;
+    // Affichage de la question : format libre fourni par l'activité (terme manquant,
+    // addition posée, problème…) ou, par défaut, « prompt = ? ».
+    const custom = activity.renderQuestion?.(q, answerEl);
+    questionEl.className = custom ? 'question question-custom' : 'question';
+    clear(questionEl).append(...(custom
+      ? [custom]
+      : [h('span', { class: 'q-prompt' }, q.prompt), h('span', { class: 'q-eq' }, '='), answerEl]));
     input = '';
     attempt = 1;
     mode = 'answer';
     clear(helpEl);
     feedbackEl.textContent = '';
     feedbackEl.className = 'feedback';
-    questionEl.classList.remove('correct', 'retype');
     progress.current(index);
     topBar.querySelector('.topbar-count').textContent = `${index + 1} / ${count}`;
     renderInput();

@@ -186,8 +186,8 @@ export function tenFrames(groups, { highlightEmpty = false } = {}) {
       }))));
 }
 
-// Ligne numérique : le chat part du plus grand nombre et fait des bonds.
-function numberLine(start, hops) {
+// Ligne numérique : le chat part de `start` et fait `hops` bonds (🏁 = arrivée, en option).
+export function numberLine(start, hops, { flag = false } = {}) {
   const from = Math.max(0, start - 2);
   const to = start + hops + 2;
   const cells = [];
@@ -195,10 +195,28 @@ function numberLine(start, hops) {
     const isStart = n === start;
     const isHop = n > start && n <= start + hops;
     cells.push(h('div', { class: `nl-cell ${isStart ? 'start' : ''} ${isHop ? 'hop' : ''}` },
-      h('span', { class: 'nl-mark' }, isStart ? '🐈' : isHop ? '🐾' : ''),
+      h('span', { class: 'nl-mark' }, isStart ? '🐈' : flag && n === start + hops ? '🏁' : isHop ? '🐾' : ''),
       h('span', { class: 'nl-num' }, n)));
   }
   return h('div', { class: 'numline' }, cells);
+}
+
+// Addition posée en colonnes pour les nombres à 2 chiffres (comme au CE1).
+export function renderQuestion(q, answerEl) {
+  if (q.a < 10) return null;
+  const digits = (n) => {
+    const s = String(n);
+    return [s.length > 1 ? s[0] : '', s[s.length - 1]];
+  };
+  const [ta, ua] = digits(q.a);
+  const [tb, ub] = digits(q.b);
+  const cell = (t, cls = '') => h('span', { class: `col-cell ${cls}` }, t);
+  return h('div', { class: 'column-op', 'aria-label': `${q.a} plus ${q.b}` },
+    cell(''), cell('d', 'col-head'), cell('u', 'col-head'),
+    cell(''), cell(ta), cell(ua),
+    cell('+', 'col-sign'), cell(tb), cell(ub),
+    h('span', { class: 'col-line' }),
+    h('span', { class: 'col-answer' }, answerEl));
 }
 
 // Indice après la 1re erreur : une stratégie, sans donner la réponse.
@@ -289,6 +307,7 @@ export default {
   levelFacts,
   diagnose,
   speak,
+  renderQuestion,
   renderHint,
   renderHelp,
   renderGrimoire,

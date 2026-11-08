@@ -43,3 +43,11 @@ function router() {
 load();
 window.addEventListener('hashchange', router);
 router();
+
+// Mode hors ligne (PWA). Désactivé en local pour toujours voir la dernière version du code.
+const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+if ('serviceWorker' in navigator && !isLocal) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker non enregistré', e));
+  });
+}

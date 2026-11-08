@@ -3,6 +3,7 @@
 import { h } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
 import { celebrate } from '../ui/confetti.js';
+import { icon } from '../ui/icons.js';
 import { getState } from '../store.js';
 import { gemProgress, rankInfo } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
@@ -32,7 +33,11 @@ export function render(root, ctx) {
   if (r.hats >= 2) talk.mood('happy', 3000);
 
   const hats = h('div', { class: 'hats', 'aria-label': `${r.hats} chapeaux sur 3` },
-    [1, 2, 3].map((n) => h('span', { class: `hat ${n <= r.hats ? 'on' : 'off'}`, style: { animationDelay: `${n * 0.25}s` } }, '🎩')));
+    [1, 2, 3].map((n) => {
+      const el = icon('hat', { size: '5rem', color: rankInfo(s.wallet.totalStars).rank.hat, className: `hat ${n <= r.hats ? 'on' : 'off'}` });
+      el.style.animationDelay = `${n * 0.25}s`;
+      return el;
+    }));
 
   const news = [];
   if (r.gemEarned) news.push(h('div', { class: 'news gem-news' }, '💎 Tu gagnes une Gemme de lune ! Tu peux faire tourner la Roue du Destin !'));

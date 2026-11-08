@@ -1,7 +1,10 @@
 # 🐱 L'École des Chats Sorciers
 
 Outil d'aide aux devoirs ludique pour un enfant de 6 ans, sur le thème chat, sorcier et magie.
-Première activité : les **Potions d'addition**.
+Activités :
+- 🧪 **Potions d'addition** : 10 niveaux, de « jusqu'à 5 » à l'addition posée avec retenue.
+- 🔮 **Potions mystères** : le terme manquant (`3 + ? = 7`), pour préparer la soustraction.
+- 📜 **Énigmes du grimoire** : de petits problèmes illustrés, avec lecture de l'énoncé à voix haute.
 
 - Site 100 % statique : HTML, CSS et JavaScript (modules ES), **aucune dépendance, aucun build**.
 - La progression est enregistrée dans le navigateur (`localStorage`), sur l'ordinateur de l'enfant. Rien n'est envoyé sur Internet.
@@ -35,6 +38,14 @@ python3 -m http.server 8000
 Chaque `git push` met le site à jour en une minute environ. La progression de l'enfant n'est pas touchée, car elle reste dans son navigateur.
 
 *Avec GitLab Pages, c'est le même principe : ajouter un `.gitlab-ci.yml` qui copie les fichiers dans `public/`.*
+
+### Installer comme une application (hors ligne)
+
+Sur l'ordinateur de l'enfant, ouvrir le site dans Chrome ou Edge, puis cliquer sur l'icône **Installer** dans la barre d'adresse (ou menu ⋮ → *Installer L'École des Chats Sorciers*). L'application s'ouvre ensuite dans sa propre fenêtre, sans onglets ni barre d'adresse, et fonctionne **sans Internet**.
+
+Mises à jour : après un `git push`, la nouvelle version est téléchargée en arrière-plan au lancement suivant, puis affichée au lancement d'après. Le mode hors ligne est désactivé sur `localhost` pour toujours voir la dernière version pendant le développement.
+
+> Si vous ajoutez un nouveau fichier JS ou CSS, ajoutez-le aussi à la liste `CORE` de `sw.js` pour qu'il soit disponible hors ligne dès la première visite.
 
 ## Comment ça marche
 
@@ -100,9 +111,12 @@ tests/                   tests (navigateur ou Node)
      renderHint(question) { /* → indice de stratégie après la 1re erreur */ },
      speak(question) { /* → phrase lue par le bouton 🔊 */ },
      renderGrimoire(actState, { isMastered }) { /* → page du grimoire */ },
+     renderQuestion(question, answerEl) { /* → affichage libre de la question (y placer answerEl), ou null */ },
    };
    ```
-2. L'ajouter dans `js/activities/registry.js`.
+2. L'ajouter dans `js/activities/registry.js` (et dans la liste `CORE` de `sw.js`).
+
+`mystery.js` et `problems.js` montrent comment réutiliser les calculs de l'addition avec un autre affichage.
 
 C'est tout : l'accueil, le moteur d'exercice, les récompenses, les niveaux et l'Espace parent la prennent en charge automatiquement.
 

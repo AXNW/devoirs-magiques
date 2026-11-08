@@ -3,6 +3,9 @@
 
 import addition, { buildPool, keyOf, diagnose, levelFacts } from '../js/activities/addition.js';
 import { digitFromKeyEvent } from '../js/screens/exercise.js';
+import mystery, { toMystery } from '../js/activities/mystery.js';
+import problems, { STORIES } from '../js/activities/problems.js';
+import { ACTIVITIES } from '../js/activities/registry.js';
 import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, applyChoice, isMastered, levelMastery, levelProgress, dailyLimitReached, recommendedActivity } from '../js/rewards.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
@@ -129,6 +132,50 @@ test('clavier : rangée AZERTY sans Maj et pavé numérique', () => {
 });
 
 const hasZeroKey = (k) => k.startsWith('0+');
+
+test('potions mystères : a + ? = s cohérent et dans les bornes', () => {
+  const rng = makeSeededRng(8);
+  for (const lvl of mystery.levels) {
+    for (let run = 0; run < 30; run++) {
+      for (const q of mystery.generate(lvl.params, { rng })) {
+        eq(q.known + q.answer, q.sum, q.prompt);
+        assert(q.sum <= lvl.params.max && q.sum >= (lvl.params.min ?? 0), `hors bornes ${q.prompt}`);
+        assert(q.prompt.includes('?'), q.prompt);
+        assert(mystery.check(q, String(q.answer)));
+      }
+    }
+  }
+  const q = toMystery({ a: 3, b: 4, answer: 7, key: '3+4' }, () => 0.9);
+  eq(q.prompt, '3 + ? = 7'); eq(q.answer, 4);
+  assert(mystery.diagnose(q, '7').includes('résultat'));
+  assert(mystery.diagnose(q, '10').includes('additionné'));
+});
+
+test('énigmes : énoncés accordés au singulier et au pluriel', () => {
+  for (const st of STORIES) {
+    const one = st.text(1, 1);
+    assert(!/\b1 \S+s\b/.test(one), `pluriel avec 1 : ${one}`);
+    assert(st.text(3, 2).includes('3') && st.text(3, 2).includes('2'));
+  }
+  eq(STORIES[0].text(1, 2).startsWith('Le chat a 1 poisson.'), true);
+  const rng = makeSeededRng(4);
+  for (const lvl of problems.levels) {
+    for (const q of problems.generate(lvl.params, { rng })) {
+      assert(q.a >= 1 && q.b >= 1, 'pas de 0 dans une histoire');
+      assert(q.answer <= lvl.params.max, q.prompt);
+      assert(typeof q.text === 'string' && q.text.length > 20);
+    }
+  }
+});
+
+test('registre : identifiants uniques et contrat minimal respecté', () => {
+  const ids = ACTIVITIES.map((a) => a.id);
+  eq(new Set(ids).size, ids.length);
+  for (const a of ACTIVITIES) {
+    assert(typeof a.generate === 'function' && typeof a.check === 'function' && typeof a.renderHelp === 'function', a.id);
+    a.levels.forEach((l, i) => eq(l.id, i + 1, `${a.id} : niveaux numérotés 1, 2, 3…`));
+  }
+});
 
 // ---- Récompenses ----
 
