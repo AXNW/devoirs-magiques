@@ -8,9 +8,9 @@ import { createMascot } from './mascot.js';
 
 const ICON_FOR = { star: 'star', half: 'sparkle', miss: 'cloud' };
 
-export function createProgress(count, { hatColor } = {}) {
+export function createProgress(count) {
   const slots = Array.from({ length: count }, () => h('span', { class: 'slot pending' }));
-  const walker = h('span', { class: 'walker', 'aria-hidden': 'true' }, createMascot({ size: 44, hatColor }));
+  const walker = h('span', { class: 'walker', 'aria-hidden': 'true' }, createMascot({ size: 44 }));
   const ball = h('span', { class: 'goal' }, icon('ball', { size: '2.6rem' }));
   const el = h('div', { class: 'progress' },
     h('div', { class: 'track' }, walker, h('div', { class: 'slots' }, slots)),

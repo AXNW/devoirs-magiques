@@ -6,8 +6,9 @@ import { digitFromKeyEvent } from '../js/screens/exercise.js';
 import mystery, { toMystery } from '../js/activities/mystery.js';
 import problems, { STORIES } from '../js/activities/problems.js';
 import { ACTIVITIES } from '../js/activities/registry.js';
-import { voiceScore } from '../js/sound.js';
-import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, applyChoice, isMastered, levelMastery, levelProgress, dailyLimitReached, recommendedActivity } from '../js/rewards.js';
+import { LINES, allClips, line, pickLine, num, storySentence, catNameKey } from '../js/voice/lines.js';
+import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, applyChoice, isMastered, levelMastery, levelProgress, dailyLimitReached, recommendedActivity, newlyUnlockedItems, hatColorFor, isItemUnlocked } from '../js/rewards.js';
+import { CAT_OPTIONS, RANKS } from '../js/config.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
 
@@ -152,19 +153,21 @@ test('potions mystères : a + ? = s cohérent et dans les bornes', () => {
   assert(mystery.diagnose(q, '10').includes('additionné'));
 });
 
-test('énigmes : énoncés accordés au singulier et au pluriel', () => {
+test('énigmes : énoncés accordés au singulier et au pluriel, termes de 1 à 10', () => {
   for (const st of STORIES) {
-    const one = st.text(1, 1);
-    assert(!/\b1 \S+s\b/.test(one), `pluriel avec 1 : ${one}`);
-    assert(st.text(3, 2).includes('3') && st.text(3, 2).includes('2'));
+    for (const part of ['first', 'second']) {
+      const one = storySentence(st, part, 1);
+      assert(!one.includes('{n}') && !/\b1\b/.test(one), `singulier écrit en toutes lettres : ${one}`);
+      assert(storySentence(st, part, 3).includes('3'), `${st.id} ${part}`);
+    }
   }
-  eq(STORIES[0].text(1, 2).startsWith('Le chat a 1 poisson.'), true);
+  eq(storySentence(STORIES[0], 'first', 1), 'Le chat a un poisson.');
   const rng = makeSeededRng(4);
   for (const lvl of problems.levels) {
     for (const q of problems.generate(lvl.params, { rng })) {
-      assert(q.a >= 1 && q.b >= 1, 'pas de 0 dans une histoire');
+      assert(q.a >= 1 && q.b >= 1 && q.a <= 10 && q.b <= 10, `termes enregistrés : ${q.prompt}`);
       assert(q.answer <= lvl.params.max, q.prompt);
-      assert(typeof q.text === 'string' && q.text.length > 20);
+      assert(q.text.startsWith(storySentence(STORIES[q.story], 'first', q.a)));
     }
   }
 });
@@ -369,12 +372,55 @@ test('bouton Jouer : dernière activité jouée, sinon la première', () => {
   eq(recommendedActivity(s, [addition, other]).id, 'autre');
 });
 
-test('voix : les voix naturelles passent avant les voix système', () => {
-  const natural = { name: 'Microsoft Denise Online (Natural) - French (France)', lang: 'fr-FR', localService: false };
-  const google = { name: 'Google français', lang: 'fr-FR', localService: false };
-  const robot = { name: 'Microsoft Hortense - French (France)', lang: 'fr-FR', localService: true };
-  const list = [robot, google, natural].sort((a, b) => voiceScore(b) - voiceScore(a));
-  eq(list.map((v) => v.name.split(' ')[1]).join(','), 'Denise,français,Hortense');
+
+test('voix enregistrées : catalogue valide et calculs entièrement couverts', () => {
+  const clips = allClips();
+  const keys = new Set(clips.map((c) => c.key));
+  eq(keys.size, clips.length, 'clés uniques');
+  for (const c of clips) assert(/^[a-z0-9_]+$/.test(c.key) && c.text.length > 0, c.key);
+  eq(num(7), 'n7'); eq(num(101), null);
+  eq(line('exercise', 'start').clips[0], 'exercise_start');
+  assert(keys.has(pickLine('praise').clips[0]));
+  const rng = makeSeededRng(12);
+  for (const act of [addition, mystery, problems]) {
+    for (const lvl of act.levels) {
+      for (const q of act.generate(lvl.params, { rng })) {
+        const parts = act.speakClips(q);
+        assert(parts.every((k) => k && keys.has(k)), `${act.id} : ${q.prompt} → ${parts}`);
+      }
+    }
+  }
+  eq(LINES.results.length, 4, 'un message par nombre de chapeaux (0 à 3)');
+  eq(catNameKey('Moustache'), 'names_moustache');
+  eq(catNameKey('réglisse'), 'names_reglisse');
+  eq(catNameKey('Zorro'), null);
+  for (const n of Object.keys(LINES.names)) assert(keys.has(`names_${n}`));
+});
+
+test('personnalisation du chat : options débloquées par la progression', () => {
+  const s = defaultState();
+  const spots = CAT_OPTIONS.pattern.items.find((i) => i.id === 'spots');
+  assert(!isItemUnlocked(s, spots));
+  const free = Object.values(CAT_OPTIONS).flatMap((g) => g.items).filter((i) => !i.unlock);
+  assert(free.every((i) => isItemUnlocked(s, i)), 'les options sans condition sont libres');
+  for (const g of Object.values(CAT_OPTIONS)) assert(g.items.every((i) => !i.unlock || i.hint), 'chaque option fermée a un indice');
+
+  let st = s;
+  let r;
+  for (let i = 0; i < 5; i++) { r = applyExerciseResult(st, { level: 1, stars: 6, total: 10, answers: [] }, addition); st = r.state; }
+  assert(r.events.newItems.some((it) => it.id === 'spots'), 'pois débloqués au 5e exercice');
+  eq(newlyUnlockedItems(st, st).length, 0);
+});
+
+test('couleur du chapeau : selon le rang, ou couleur choisie si le rang est atteint', () => {
+  const s = defaultState();
+  eq(hatColorFor(s), RANKS[0].hat);
+  s.profile.cat.hatColor = RANKS[2].hat;
+  eq(hatColorFor(s), RANKS[0].hat, 'couleur pas encore débloquée');
+  s.wallet.totalStars = RANKS[2].min;
+  eq(hatColorFor(s), RANKS[2].hat);
+  s.profile.cat.hatColor = 'auto';
+  eq(hatColorFor(s), RANKS[2].hat);
 });
 
 // ---- Sauvegarde ----
@@ -385,7 +431,10 @@ test('migration : état vide, état partiel, version future', () => {
   eq(partial.wallet.gems, 4);
   eq(partial.wallet.totalStars, 0);
   eq(partial.settings.exercisesPerGem, 10);
-  eq(migrate({ version: 2, profile: { name: 'X' } }).profile.cat.name, 'Moustache');
+  const old = migrate({ version: 2, profile: { name: 'X', cat: { name: 'Zorro', fur: 'roux', eyes: 'bleu' } } });
+  eq(old.profile.cat.name, 'Zorro');
+  eq(old.profile.cat.hat, 'wizard');
+  eq(old.profile.cat.accessory, 'none');
   let threw = false;
   try { migrate({ version: SCHEMA_VERSION + 1 }); } catch { threw = true; }
   assert(threw, 'une version future doit être refusée');

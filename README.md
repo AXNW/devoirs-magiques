@@ -47,6 +47,28 @@ Mises à jour : après un `git push`, la nouvelle version est téléchargée en 
 
 > Si vous ajoutez un nouveau fichier JS ou CSS, ajoutez-le aussi à la liste `CORE` de `sw.js` pour qu'il soit disponible hors ligne dès la première visite.
 
+## Voix pré-enregistrées (ElevenLabs)
+
+Le chat parle **uniquement avec des phrases pré-enregistrées**, pour que sa voix reste toujours la même. Il n'y a pas de synthèse vocale du navigateur. Ces voix sont générées **une seule fois** et rangées dans `audio/voice/` : phrases du chat, mots et nombres des calculs (assemblés à la lecture), énoncés des énigmes (une phrase par nombre de 1 à 10) et noms de chat.
+
+Le catalogue est dans `js/voice/lines.js` : environ 300 enregistrements pour quelque 5 800 caractères, ce qui tient dans l'offre gratuite d'ElevenLabs. Un bouton 🔊 n'apparaît que si la phrase correspondante est enregistrée. Le prénom de l'enfant s'affiche mais n'est jamais prononcé, car il n'est pas enregistré. Le nom du chat n'est prononcé que s'il fait partie de la liste proposée.
+
+1. Créer un compte **personnel** sur elevenlabs.io et une clé API (*Developers → API Keys*). Choisir une voix qui parle bien français dans la *Voice Library* et l'ajouter à « My Voices ».
+2. Dans **votre propre terminal** (pas dans une conversation ou un outil qui garde un historique), saisir la clé sans qu'elle s'affiche :
+   ```bash
+   read -rs ELEVENLABS_API_KEY && export ELEVENLABS_API_KEY
+   ```
+3. Trouver l'identifiant de la voix, l'indiquer, puis générer :
+   ```bash
+   python3 tools/generate_voice.py --list-voices
+   export ELEVENLABS_VOICE_ID=<voice_id>
+   python3 tools/generate_voice.py --dry-run   # vérifier
+   python3 tools/generate_voice.py
+   ```
+4. Écouter en local (Espace parent → 🔊 Voix → ▶️), puis committer `audio/voice/` et pousser.
+
+Si vous modifiez une phrase de `lines.js`, relancez simplement le script : il ne régénère que ce qui a changé. Pour changer de voix, mettez à jour `ELEVENLABS_VOICE_ID` et ajoutez `--force`. La clé n'est jamais écrite dans un fichier ; `audio/voice/index.json` ne contient que la liste des phrases, l'identifiant de la voix et le modèle.
+
 ## Comment ça marche
 
 | Élément | Règle (modifiable dans l'Espace parent) |
@@ -57,7 +79,7 @@ Mises à jour : après un `git push`, la nouvelle version est téléchargée en 
 | Exercice réussi | au moins 1 chapeau |
 | Gemme de lune 💎 | 10 exercices réussis = 1 gemme = 1 tour de Roue du Destin |
 | Choisir sa récompense | à 3 gemmes, l'enfant peut choisir sa récompense au lieu de tourner la roue (réglable, 0 = désactivé) |
-| Mon chat 🎨 | l'enfant choisit le nom, le pelage et les yeux de son chat ; la couleur du chapeau suit le rang |
+| Mon chat 🎨 | nom (liste de noms que le chat sait dire, ou nom libre), pelage, yeux, motif, chapeau et sa couleur, accessoire, baguette. Certaines options se **débloquent** avec la progression (exercices, étoiles, sans-fautes, gemmes, familiers) ; l'écran de résultats annonce chaque nouveauté |
 | Calcul « su » | réussi 3 fois d'affilée du premier coup. Les calculs sus s'écrivent en or dans le **grimoire** (table d'addition) |
 | Niveaux | le niveau suivant s'ouvre quand 80 % de ses calculs sont sus **ou** après 3 sans-fautes, **sans dépasser le plafond** fixé par le parent |
 | Anti-frustration | après 2 exercices difficiles d'affilée, le chat propose de s'échauffer au niveau précédent |
@@ -109,7 +131,7 @@ tests/                   tests (navigateur ou Node)
      levelFacts(params) { /* → liste des clés de calcul du niveau (maîtrise), ou null */ },
      diagnose(question, input) { /* → message pour une erreur typique, ou null */ },
      renderHint(question) { /* → indice de stratégie après la 1re erreur */ },
-     speak(question) { /* → phrase lue par le bouton 🔊 */ },
+     speakClips(question) { /* → enregistrements à enchaîner pour le bouton 🔊 (voir js/voice/lines.js) */ },
      renderGrimoire(actState, { isMastered }) { /* → page du grimoire */ },
      renderQuestion(question, answerEl) { /* → affichage libre de la question (y placer answerEl), ou null */ },
    };

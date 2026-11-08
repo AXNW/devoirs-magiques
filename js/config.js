@@ -13,19 +13,18 @@ export const DEFAULT_SETTINGS = {
   masteryToUnlock: 80,      // % des calculs du niveau « sus » pour débloquer le suivant
   dailyPauseHint: 3,        // le chat propose une pause tous les N exercices (0 = jamais)
   dailyLimit: 0,            // nombre maximum d'exercices par jour (0 = illimité)
-  voiceEnabled: true,       // boutons 🔊 de lecture à voix haute
-  voiceName: '',            // voix choisie ('' = la plus naturelle disponible)
-  voiceRate: 0.95,          // vitesse de lecture
+  voiceEnabled: true,       // boutons 🔊 (voix pré-enregistrée du chat)
 };
 
-// Personnalisation du chat (pelage, yeux). `whisker` = couleur des moustaches lisible sur ce pelage.
+// Personnalisation du chat. `mark` = couleur des motifs (rayures, taches) sur ce pelage,
+// `whisker` = couleur des moustaches lisible sur ce pelage.
 export const CAT_FURS = [
-  { id: 'nuit',     label: 'Nuit',     color: '#3b3060', whisker: '#e9e0ff' },
-  { id: 'roux',     label: 'Roux',     color: '#e07a2f', whisker: '#fff4e0' },
-  { id: 'gris',     label: 'Gris',     color: '#8a8fa3', whisker: '#ffffff' },
-  { id: 'chocolat', label: 'Chocolat', color: '#6b4226', whisker: '#f3e2cf' },
-  { id: 'creme',    label: 'Crème',    color: '#e9c99a', whisker: '#6b4226' },
-  { id: 'neige',    label: 'Neige',    color: '#f4f1ea', whisker: '#8a8fa3' },
+  { id: 'nuit',     label: 'Nuit',     color: '#3b3060', whisker: '#e9e0ff', mark: 'rgba(255,255,255,.22)' },
+  { id: 'roux',     label: 'Roux',     color: '#e07a2f', whisker: '#fff4e0', mark: 'rgba(120,40,0,.35)' },
+  { id: 'gris',     label: 'Gris',     color: '#8a8fa3', whisker: '#ffffff', mark: 'rgba(30,30,50,.3)' },
+  { id: 'chocolat', label: 'Chocolat', color: '#6b4226', whisker: '#f3e2cf', mark: 'rgba(255,230,200,.25)' },
+  { id: 'creme',    label: 'Crème',    color: '#e9c99a', whisker: '#6b4226', mark: 'rgba(150,90,30,.35)' },
+  { id: 'neige',    label: 'Neige',    color: '#f4f1ea', whisker: '#8a8fa3', mark: 'rgba(60,60,80,.25)' },
 ];
 export const CAT_EYES = [
   { id: 'vert',  label: 'Vert',  color: '#c6ff6b' },
@@ -33,6 +32,48 @@ export const CAT_EYES = [
   { id: 'ambre', label: 'Ambre', color: '#ffb347' },
   { id: 'rose',  label: 'Rose',  color: '#ff9ec7' },
 ];
+
+// Options à débloquer : `unlock(state)` renvoie true quand l'option est gagnée ;
+// sans `unlock`, l'option est disponible tout de suite.
+export const CAT_OPTIONS = {
+  pattern: {
+    title: 'Son motif',
+    items: [
+      { id: 'none',    label: 'Uni' },
+      { id: 'stripes', label: 'Tigré' },
+      { id: 'patch',   label: 'Tache sur l’œil' },
+      { id: 'muzzle',  label: 'Museau blanc' },
+      { id: 'spots',   label: 'Pois magiques', unlock: (s) => s.stats.exercisesDone >= 5, hint: 'Termine 5 exercices' },
+    ],
+  },
+  hat: {
+    title: 'Son chapeau',
+    items: [
+      { id: 'wizard', label: 'Chapeau pointu' },
+      { id: 'none',   label: 'Sans chapeau' },
+      { id: 'witch',  label: 'Chapeau à boucle', unlock: (s) => s.wallet.totalStars >= 30,  hint: 'Deviens Apprenti sorcier (30 ⭐)' },
+      { id: 'crown',  label: 'Couronne',         unlock: (s) => s.wallet.totalStars >= 250, hint: 'Deviens Grand mage (250 ⭐)' },
+    ],
+  },
+  accessory: {
+    title: 'Son accessoire',
+    items: [
+      { id: 'none',    label: 'Aucun' },
+      { id: 'bow',     label: 'Nœud papillon' },
+      { id: 'bell',    label: 'Grelot',   unlock: (s) => s.stats.exercisesDone >= 10, hint: 'Termine 10 exercices' },
+      { id: 'scarf',   label: 'Écharpe',  unlock: (s) => s.stats.perfectCount >= 3,   hint: 'Fais 3 sans-fautes' },
+      { id: 'glasses', label: 'Lunettes', unlock: (s) => s.collection.length >= 5,    hint: 'Collectionne 5 familiers' },
+    ],
+  },
+  wand: {
+    title: 'Sa baguette',
+    items: [
+      { id: 'star',  label: 'Étoile' },
+      { id: 'moon',  label: 'Lune',  unlock: (s) => s.wallet.gemsEarned >= 1, hint: 'Gagne une Gemme de lune' },
+      { id: 'heart', label: 'Cœur',  unlock: (s) => s.stats.levelUps >= 2,    hint: 'Débloque 2 niveaux' },
+    ],
+  },
+};
 
 // Un calcul est « su » après ce nombre de réussites du premier coup d'affilée.
 export const MASTERY_STREAK = 3;

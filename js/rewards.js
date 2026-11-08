@@ -1,7 +1,7 @@
 // Règles de récompense : fonctions pures (aucun accès au DOM ni au stockage),
 // faciles à tester. Elles reçoivent un état et renvoient un nouvel état.
 
-import { RANKS, FAMILIARS, MASTERY_STREAK } from './config.js';
+import { RANKS, FAMILIARS, MASTERY_STREAK, CAT_OPTIONS } from './config.js';
 import { activityState } from './store.js';
 import { weightedPick } from './rng.js';
 
@@ -76,6 +76,35 @@ export function levelProgress(act, activity, levelId, settings) {
 export function recommendedActivity(state, activities) {
   const last = [...state.history].reverse().find((x) => activities.some((a) => a.id === x.activity));
   return activities.find((a) => a.id === last?.activity) ?? activities[0];
+}
+
+// ---- Personnalisation du chat ----
+
+export function isItemUnlocked(state, item) {
+  return !item.unlock || item.unlock(state);
+}
+
+// Options du chat débloquées entre deux états : [{ category, id, label }].
+export function newlyUnlockedItems(before, after) {
+  const out = [];
+  for (const [category, { items }] of Object.entries(CAT_OPTIONS)) {
+    for (const item of items) {
+      if (item.unlock && !item.unlock(before) && item.unlock(after)) out.push({ category, id: item.id, label: item.label });
+    }
+  }
+  return out;
+}
+
+// Couleurs de chapeau disponibles : une par rang atteint.
+export function hatColorsUnlocked(state) {
+  return RANKS.filter((r) => state.wallet.totalStars >= r.min);
+}
+
+// Couleur du chapeau : celle choisie (si le rang est atteint), sinon celle du rang actuel.
+export function hatColorFor(state) {
+  const chosen = state.profile.cat?.hatColor;
+  const unlocked = hatColorsUnlocked(state);
+  return unlocked.find((r) => r.hat === chosen)?.hat ?? rankInfo(state.wallet.totalStars).rank.hat;
 }
 
 // ---- Rythme quotidien ----
@@ -174,7 +203,10 @@ export function applyExerciseResult(prev, result, activity, now = new Date()) {
 
   return {
     state: s,
-    events: { hats, success, gemEarned, levelUnlocked, newFamiliars, rankUp, suggestEasier, today, pauseHint, limitReached },
+    events: {
+      hats, success, gemEarned, levelUnlocked, newFamiliars, rankUp, suggestEasier, today, pauseHint, limitReached,
+      newItems: newlyUnlockedItems(prev, s),
+    },
   };
 }
 
