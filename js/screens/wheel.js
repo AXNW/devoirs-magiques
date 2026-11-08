@@ -3,7 +3,7 @@
 import { h, showModal } from '../ui/dom.js';
 import { celebrate } from '../ui/confetti.js';
 import { getState, setState } from '../store.js';
-import { applySpin } from '../rewards.js';
+import { applySpin, applyChoice } from '../rewards.js';
 import { play } from '../sound.js';
 
 const COLORS = ['#7b5cd6', '#3f8efc', '#e0457b', '#2bb673', '#f2b705', '#ff7a1a', '#9b6dff', '#14b8c4'];
@@ -58,6 +58,8 @@ export function render(root, ctx) {
 
   const gemsEl = h('span', { class: 'wheel-gems' });
   const spinBtn = h('button', { class: 'btn btn-magic big', onClick: spin }, '✨ Tourner la roue');
+  const chooseBtn = h('button', { class: 'btn', onClick: openChoice });
+  const chooseHint = h('p', { class: 'muted small' });
   const hint = h('p', { class: 'muted' });
   const disc = h('div', { class: 'wheel-disc' });
   const segs = segments(s.prizes);
@@ -72,6 +74,56 @@ export function render(root, ctx) {
     if (!s.prizes.length) hint.textContent = 'Demande à un adulte d’ajouter des récompenses dans l’Espace parent.';
     else if (s.wallet.gems < cost) hint.textContent = `Il faut ${cost} gemme${cost > 1 ? 's' : ''} pour tourner la roue. Réussis des exercices pour en gagner !`;
     else hint.textContent = `Un tour coûte ${cost} gemme${cost > 1 ? 's' : ''}.`;
+
+    // Choisir sa récompense : plus cher, mais sans hasard.
+    const choose = s.settings.gemsToChoose;
+    const choosable = s.prizes.some((p) => !p.respin);
+    chooseBtn.hidden = !choose || !choosable;
+    chooseHint.hidden = chooseBtn.hidden;
+    chooseBtn.textContent = `🎁 Choisir ma récompense (${choose} 💎)`;
+    chooseBtn.disabled = spinning || s.wallet.gems < choose;
+    chooseHint.textContent = s.wallet.gems < choose
+      ? `Avec ${choose} gemmes, tu pourras choisir toi-même ta récompense !`
+      : 'Tu peux aussi garder tes gemmes pour choisir ta récompense.';
+  }
+
+  function showVoucher(prize, newFamiliars, chosen = false) {
+    play('win');
+    celebrate(60);
+    showModal(
+      h('div', { class: 'voucher' },
+        h('p', { class: 'voucher-title' }, '📜 Bon magique 📜'),
+        h('div', { class: 'voucher-emoji' }, prize.emoji || '🎁'),
+        h('p', { class: 'voucher-label' }, prize.label),
+        prize.respin
+          ? h('p', { class: 'muted' }, 'Ta gemme t’est rendue : tu peux retourner la roue !')
+          : h('p', { class: 'muted' }, `${chosen ? 'Excellent choix ! ' : ''}Montre ce bon à un adulte pour recevoir ta récompense.`),
+        newFamiliars.map((f) => h('p', { class: 'news' }, `${f.emoji} Nouveau familier : ${f.name} !`)),
+      ),
+      [{ label: 'Super !', class: 'btn' }],
+    );
+  }
+
+  function openChoice() {
+    if (spinning) return;
+    const st = getState();
+    const close = showModal(
+      h('div', {},
+        h('p', { class: 'modal-title' }, 'Quelle récompense veux-tu ?'),
+        h('div', { class: 'choice-list' },
+          st.prizes.map((p, i) => (p.respin ? null : h('button', {
+            class: 'choice',
+            onClick: () => {
+              const res = applyChoice(getState(), i);
+              close();
+              if (!res) return;
+              setState(res.state);
+              refresh();
+              showVoucher(res.prize, res.newFamiliars, true);
+            },
+          }, h('span', { class: 'choice-emoji' }, p.emoji || '🎁'), p.label))))),
+      [{ label: 'Je réfléchis encore', class: 'btn btn-soft' }],
+    );
   }
 
   function spin() {
@@ -95,21 +147,7 @@ export function render(root, ctx) {
     timers.push(setTimeout(() => {
       spinning = false;
       refresh();
-      play('win');
-      celebrate(60);
-      const p = res.prize;
-      showModal(
-        h('div', { class: 'voucher' },
-          h('p', { class: 'voucher-title' }, '📜 Bon magique 📜'),
-          h('div', { class: 'voucher-emoji' }, p.emoji || '🎁'),
-          h('p', { class: 'voucher-label' }, p.label),
-          p.respin
-            ? h('p', { class: 'muted' }, 'Ta gemme t’est rendue : tu peux retourner la roue !')
-            : h('p', { class: 'muted' }, 'Montre ce bon à un adulte pour recevoir ta récompense.'),
-          res.newFamiliars.map((f) => h('p', { class: 'news' }, `${f.emoji} Nouveau familier : ${f.name} !`)),
-        ),
-        [{ label: 'Super !', class: 'btn' }],
-      );
+      showVoucher(res.prize, res.newFamiliars);
     }, SPIN_MS + 200));
   }
 
@@ -127,6 +165,8 @@ export function render(root, ctx) {
           segs.map((sg) => h('li', {}, h('span', { class: 'dot', style: { background: sg.color } }), `${sg.prize.emoji || '🎁'} ${sg.prize.label}`))),
         spinBtn,
         hint,
+        chooseBtn,
+        chooseHint,
       ),
     ),
   );

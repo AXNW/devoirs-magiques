@@ -65,7 +65,7 @@ p { margin: .3em 0; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 .block { display: block; }
-.hidden { display: none; }
+.hidden, [hidden] { display: none !important; }
 
 button { font-family: inherit; }
 :focus-visible { outline: 4px solid var(--sky-blue); outline-offset: 3px; }

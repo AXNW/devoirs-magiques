@@ -8,11 +8,28 @@ export const DEFAULT_SETTINGS = {
   successMinHats: 1,        // chapeaux minimum pour qu'un exercice compte comme « réussi »
   exercisesPerGem: 10,      // exercices réussis pour gagner une Gemme de lune
   gemsPerSpin: 1,           // gemmes nécessaires pour tourner la roue
+  gemsToChoose: 3,          // gemmes pour CHOISIR sa récompense au lieu du hasard (0 = désactivé)
   perfectsToUnlock: 3,      // OU : exercices à 3 chapeaux pour débloquer le niveau suivant
   masteryToUnlock: 80,      // % des calculs du niveau « sus » pour débloquer le suivant
   dailyPauseHint: 3,        // le chat propose une pause tous les N exercices (0 = jamais)
   dailyLimit: 0,            // nombre maximum d'exercices par jour (0 = illimité)
 };
+
+// Personnalisation du chat (pelage, yeux). `whisker` = couleur des moustaches lisible sur ce pelage.
+export const CAT_FURS = [
+  { id: 'nuit',     label: 'Nuit',     color: '#3b3060', whisker: '#e9e0ff' },
+  { id: 'roux',     label: 'Roux',     color: '#e07a2f', whisker: '#fff4e0' },
+  { id: 'gris',     label: 'Gris',     color: '#8a8fa3', whisker: '#ffffff' },
+  { id: 'chocolat', label: 'Chocolat', color: '#6b4226', whisker: '#f3e2cf' },
+  { id: 'creme',    label: 'Crème',    color: '#e9c99a', whisker: '#6b4226' },
+  { id: 'neige',    label: 'Neige',    color: '#f4f1ea', whisker: '#8a8fa3' },
+];
+export const CAT_EYES = [
+  { id: 'vert',  label: 'Vert',  color: '#c6ff6b' },
+  { id: 'bleu',  label: 'Bleu',  color: '#7fd3ff' },
+  { id: 'ambre', label: 'Ambre', color: '#ffb347' },
+  { id: 'rose',  label: 'Rose',  color: '#ff9ec7' },
+];
 
 // Un calcul est « su » après ce nombre de réussites du premier coup d'affilée.
 export const MASTERY_STREAK = 3;
@@ -41,7 +58,7 @@ export const RANKS = [
 // Familiers à collectionner. `test` reçoit l'état complet de l'application.
 export const FAMILIARS = [
   { id: 'pompon',     emoji: '🐱', name: 'Pompon',     hint: 'Termine ton premier exercice',      test: (s) => s.stats.exercisesDone >= 1 },
-  { id: 'moustache',  emoji: '😺', name: 'Moustache',  hint: 'Gagne 3 chapeaux à un exercice',     test: (s) => s.stats.perfectCount >= 1 },
+  { id: 'moustache',  emoji: '😺', name: 'Frimousse',  hint: 'Gagne 3 chapeaux à un exercice',     test: (s) => s.stats.perfectCount >= 1 },
   { id: 'grimoire',   emoji: '📖', name: 'Grimoire',   hint: 'Débloque un nouveau niveau',         test: (s) => s.stats.levelUps >= 1 },
   { id: 'caramel',    emoji: '🐈', name: 'Caramel',    hint: 'Termine 10 exercices',               test: (s) => s.stats.exercisesDone >= 10 },
   { id: 'lune',       emoji: '🌙', name: 'Lune',       hint: 'Gagne ta première Gemme de lune',    test: (s) => s.wallet.gemsEarned >= 1 },

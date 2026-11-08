@@ -2,7 +2,7 @@
 
 import { h, clear, toast, formatDate } from '../ui/dom.js';
 import { getState, update, activityState, exportJson, importJson, resetAll } from '../store.js';
-import { hatsFor, levelMastery } from '../rewards.js';
+import { hatsFor, levelMastery, isMastered } from '../rewards.js';
 import { ACTIVITIES } from '../activities/registry.js';
 
 const clampInt = (v, min, max) => Math.min(max, Math.max(min, parseInt(v, 10) || min));
@@ -117,6 +117,11 @@ function activitiesSection(s) {
           return h('p', { class: 'small' }, `Niveau ${l.id} (${l.label}) : `,
             m ? `${m.mastered} / ${m.total} calculs sus` : `${act.perfects[l.id] || 0} sans-faute(s)`);
         })),
+      activity.renderGrimoire
+        ? h('details', { class: 'calc-map' },
+          h('summary', {}, '🗺️ Carte des calculs'),
+          activity.renderGrimoire(act, { isMastered: (k) => isMastered(act, k) }))
+        : null,
     );
   });
   return section('🧪 Activités et difficulté',
@@ -149,6 +154,9 @@ function rewardsSection(s, rerender) {
       (v) => update((st) => { st.settings.exercisesPerGem = v; })),
     numberRow('Gemmes pour un tour de roue', s.settings.gemsPerSpin, 1, 20,
       (v) => update((st) => { st.settings.gemsPerSpin = v; })),
+    numberRow('Gemmes pour CHOISIR sa récompense', s.settings.gemsToChoose, 0, 50,
+      (v) => update((st) => { st.settings.gemsToChoose = v; }),
+      '0 = désactivé. Plus cher qu’un tour de roue, mais sans hasard.'),
     h('div', { class: 'row' },
       h('span', {}, `Gemmes actuelles : ${s.wallet.gems} (progression : ${s.wallet.successSinceLastGem} / ${s.settings.exercisesPerGem})`),
       h('span', { class: 'inline' },
@@ -190,7 +198,7 @@ function wheelHistorySection(s) {
       s.wheelHistory.slice(0, 30).map((w, i) => h('li', {},
         h('label', { class: 'inline' },
           h('input', { type: 'checkbox', checked: !!w.used, onChange: (e) => { update((st) => { st.wheelHistory[i].used = e.target.checked; }); saved(); } }),
-          h('span', { class: w.used ? 'used' : '' }, `${formatDate(w.date)} — ${w.emoji} ${w.label}`))))),
+          h('span', { class: w.used ? 'used' : '' }, `${formatDate(w.date)} — ${w.emoji} ${w.label}${w.chosen ? ' (choisi)' : ''}`))))),
     h('p', { class: 'muted small' }, 'Cochez un bon une fois la récompense donnée.'),
   );
 }

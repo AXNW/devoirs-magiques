@@ -2,6 +2,8 @@
 
 import { h } from './dom.js';
 import { canSpeak, speak } from '../sound.js';
+import { getState } from '../store.js';
+import { CAT_FURS, CAT_EYES } from '../config.js';
 
 const SVG = `
 <svg viewBox="0 0 220 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -14,20 +16,20 @@ const SVG = `
     <circle cx="70" cy="155" r="10" fill="#ff7eb6" opacity=".45"/>
     <circle cx="150" cy="155" r="10" fill="#ff7eb6" opacity=".45"/>
     <g class="m-eyes-open">
-      <ellipse cx="85" cy="133" rx="13" ry="16" fill="#c6ff6b"/>
-      <ellipse cx="135" cy="133" rx="13" ry="16" fill="#c6ff6b"/>
+      <ellipse cx="85" cy="133" rx="13" ry="16" fill="var(--eyes)"/>
+      <ellipse cx="135" cy="133" rx="13" ry="16" fill="var(--eyes)"/>
       <ellipse class="m-pupil" cx="86" cy="135" rx="5" ry="11" fill="#1b1035"/>
       <ellipse class="m-pupil" cx="136" cy="135" rx="5" ry="11" fill="#1b1035"/>
       <circle cx="90" cy="127" r="3.5" fill="#fff"/>
       <circle cx="140" cy="127" r="3.5" fill="#fff"/>
     </g>
-    <g class="m-eyes-happy" fill="none" stroke="#c6ff6b" stroke-width="6" stroke-linecap="round">
+    <g class="m-eyes-happy" fill="none" stroke="var(--eyes)" stroke-width="6" stroke-linecap="round">
       <path d="M72 138 Q85 120 98 138"/>
       <path d="M122 138 Q135 120 148 138"/>
     </g>
     <path d="M103 152 L117 152 L110 160 Z" fill="#ff9ec7"/>
     <path class="m-mouth" d="M96 164 Q103 172 110 164 Q117 172 124 164" fill="none" stroke="#1b1035" stroke-width="3" stroke-linecap="round"/>
-    <g stroke="#e9e0ff" stroke-width="2.5" stroke-linecap="round" opacity=".8">
+    <g stroke="var(--whisker)" stroke-width="2.5" stroke-linecap="round" opacity=".8">
       <line x1="40" y1="150" x2="78" y2="156"/><line x1="40" y1="166" x2="78" y2="162"/>
       <line x1="180" y1="150" x2="142" y2="156"/><line x1="180" y1="166" x2="142" y2="162"/>
     </g>
@@ -47,10 +49,25 @@ const SVG = `
   </g>
 </svg>`;
 
-export function createMascot({ size = 140, hatColor = '#7b5cd6' } = {}) {
+export function catColors(cat = getState().profile.cat) {
+  const fur = CAT_FURS.find((f) => f.id === cat?.fur) ?? CAT_FURS[0];
+  const eyes = CAT_EYES.find((e) => e.id === cat?.eyes) ?? CAT_EYES[0];
+  return { fur: fur.color, whisker: fur.whisker, eyes: eyes.color };
+}
+
+export function applyCatColors(el, cat) {
+  const c = catColors(cat);
+  el.style.setProperty('--cat', c.fur);
+  el.style.setProperty('--whisker', c.whisker);
+  el.style.setProperty('--eyes', c.eyes);
+}
+
+// `cat` : { fur, eyes } — par défaut, le chat choisi par l'enfant.
+export function createMascot({ size = 140, hatColor = '#7b5cd6', cat } = {}) {
   const el = h('div', { class: 'mascot mood-idle', html: SVG });
   el.style.width = `${size}px`;
   el.style.setProperty('--hat', hatColor);
+  applyCatColors(el, cat);
   return el;
 }
 

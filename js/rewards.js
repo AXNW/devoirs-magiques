@@ -64,6 +64,20 @@ export function levelMastery(act, activity, levelId, threshold = 80) {
   return { mastered, total: keys.length, ratio: mastered / keys.length, needed };
 }
 
+// Remplissage d'une fiole de niveau (0 à 1) : la meilleure des deux voies de déblocage.
+export function levelProgress(act, activity, levelId, settings) {
+  const m = levelMastery(act, activity, levelId, settings.masteryToUnlock);
+  const byMastery = m ? m.ratio / (settings.masteryToUnlock / 100) : 0;
+  const byPerfects = (act.perfects?.[levelId] || 0) / settings.perfectsToUnlock;
+  return Math.min(1, Math.max(byMastery, byPerfects));
+}
+
+// Activité proposée par le gros bouton « Jouer » : la dernière jouée, sinon la première.
+export function recommendedActivity(state, activities) {
+  const last = [...state.history].reverse().find((x) => activities.some((a) => a.id === x.activity));
+  return activities.find((a) => a.id === last?.activity) ?? activities[0];
+}
+
 // ---- Rythme quotidien ----
 
 export function exercisesOn(state, day = new Date()) {
@@ -174,6 +188,18 @@ export function applyAbandon(prev, { stars = 0, answers = [] }, activity) {
   const newFamiliars = unlockFamiliars(s);
   const after = rankInfo(s.wallet.totalStars);
   return { state: s, events: { newFamiliars, rankUp: after.index > rankBefore ? after.rank : null } };
+}
+
+// Choisir sa récompense (au lieu du hasard) pour `gemsToChoose` gemmes.
+export function applyChoice(prev, prizeIndex, now = new Date()) {
+  const s = structuredClone(prev);
+  const cost = s.settings.gemsToChoose;
+  const prize = s.prizes[prizeIndex];
+  if (!cost || s.wallet.gems < cost || !prize || prize.respin) return null;
+  s.wallet.gems -= cost;
+  s.wheelHistory.unshift({ date: now.toISOString(), emoji: prize.emoji, label: prize.label, used: false, chosen: true });
+  if (s.wheelHistory.length > MAX_WHEEL_HISTORY) s.wheelHistory.length = MAX_WHEEL_HISTORY;
+  return { state: s, prize, newFamiliars: unlockFamiliars(s) };
 }
 
 // Fait tourner la roue. Renvoie null si pas assez de gemmes ou aucune récompense.

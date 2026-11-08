@@ -3,7 +3,7 @@
 
 import addition, { buildPool, keyOf, diagnose, levelFacts } from '../js/activities/addition.js';
 import { digitFromKeyEvent } from '../js/screens/exercise.js';
-import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, isMastered, levelMastery, dailyLimitReached } from '../js/rewards.js';
+import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, applyChoice, isMastered, levelMastery, levelProgress, dailyLimitReached, recommendedActivity } from '../js/rewards.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
 
@@ -286,6 +286,41 @@ test('roue : coûte des gemmes, refuse sans gemme, relance rembourse', () => {
   eq(applySpin(s).state.wallet.gems, 1);
 });
 
+test('choisir sa récompense : coûte gemsToChoose, refuse la relance et le manque de gemmes', () => {
+  const s = defaultState();
+  s.prizes = [{ emoji: '📺', label: 'Télé', weight: 1 }, { emoji: '🔮', label: 'Relance', weight: 1, respin: true }];
+  s.wallet.gems = 2;
+  eq(applyChoice(s, 0), null, 'pas assez de gemmes');
+  s.wallet.gems = 3;
+  eq(applyChoice(s, 1), null, 'la relance ne se choisit pas');
+  const r = applyChoice(s, 0);
+  eq(r.state.wallet.gems, 0);
+  eq(r.state.wheelHistory[0].label, 'Télé');
+  assert(r.state.wheelHistory[0].chosen);
+  s.settings.gemsToChoose = 0;
+  eq(applyChoice(s, 0), null, 'désactivé');
+});
+
+test('fiole de niveau : meilleure des deux voies, plafonnée à 1', () => {
+  const s = defaultState();
+  const act = activityState(s, addition);
+  eq(levelProgress(act, addition, 1, s.settings), 0);
+  act.perfects[1] = 1;
+  assert(Math.abs(levelProgress(act, addition, 1, s.settings) - 1 / 3) < 1e-9);
+  for (const k of levelFacts(addition.levels[0].params)) act.facts[k] = { streak: 3, seen: 3 };
+  eq(levelProgress(act, addition, 1, s.settings), 1);
+});
+
+test('bouton Jouer : dernière activité jouée, sinon la première', () => {
+  const other = { id: 'autre' };
+  const s = defaultState();
+  eq(recommendedActivity(s, [addition, other]).id, 'addition');
+  s.history.push({ activity: 'autre', level: 1 });
+  eq(recommendedActivity(s, [addition, other]).id, 'autre');
+  s.history.push({ activity: 'disparue', level: 1 });
+  eq(recommendedActivity(s, [addition, other]).id, 'autre');
+});
+
 // ---- Sauvegarde ----
 
 test('migration : état vide, état partiel, version future', () => {
@@ -294,6 +329,7 @@ test('migration : état vide, état partiel, version future', () => {
   eq(partial.wallet.gems, 4);
   eq(partial.wallet.totalStars, 0);
   eq(partial.settings.exercisesPerGem, 10);
+  eq(migrate({ version: 2, profile: { name: 'X' } }).profile.cat.name, 'Moustache');
   let threw = false;
   try { migrate({ version: SCHEMA_VERSION + 1 }); } catch { threw = true; }
   assert(threw, 'une version future doit être refusée');

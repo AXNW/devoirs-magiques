@@ -12,7 +12,7 @@ export const SCHEMA_VERSION = 2;
 export function defaultState() {
   return {
     version: SCHEMA_VERSION,
-    profile: { name: '' },
+    profile: { name: '', cat: { name: 'Moustache', fur: 'nuit', eyes: 'vert' } },
     settings: { ...DEFAULT_SETTINGS },
     prizes: DEFAULT_PRIZES.map((p) => ({ ...p })),
     activities: {},

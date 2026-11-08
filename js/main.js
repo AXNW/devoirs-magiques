@@ -8,6 +8,7 @@ import * as wheel from './screens/wheel.js';
 import * as parent from './screens/parent.js';
 import * as collection from './screens/collection.js';
 import * as grimoire from './screens/grimoire.js';
+import * as cat from './screens/cat.js';
 
 const routes = {
   accueil: home,
@@ -17,6 +18,7 @@ const routes = {
   parent,
   familiers: collection,
   grimoire,
+  'mon-chat': cat,
 };
 
 const session = { lastResult: null, parentOk: false };

@@ -45,6 +45,8 @@ Chaque `git push` met le site à jour en une minute environ. La progression de l
 | Chapeaux 🎩 | 3 = sans faute, 2 = au moins 80 %, 1 = au moins 60 % |
 | Exercice réussi | au moins 1 chapeau |
 | Gemme de lune 💎 | 10 exercices réussis = 1 gemme = 1 tour de Roue du Destin |
+| Choisir sa récompense | à 3 gemmes, l'enfant peut choisir sa récompense au lieu de tourner la roue (réglable, 0 = désactivé) |
+| Mon chat 🎨 | l'enfant choisit le nom, le pelage et les yeux de son chat ; la couleur du chapeau suit le rang |
 | Calcul « su » | réussi 3 fois d'affilée du premier coup. Les calculs sus s'écrivent en or dans le **grimoire** (table d'addition) |
 | Niveaux | le niveau suivant s'ouvre quand 80 % de ses calculs sont sus **ou** après 3 sans-fautes, **sans dépasser le plafond** fixé par le parent |
 | Anti-frustration | après 2 exercices difficiles d'affilée, le chat propose de s'échauffer au niveau précédent |
@@ -53,7 +55,9 @@ Chaque `git push` met le site à jour en une minute environ. La progression de l
 | Familiers 🐾 | des cartes à collectionner, débloquées par paliers |
 | Révisions | les calculs ratés reviennent en priorité, puis ceux pas encore sus, avec quelques révisions de calculs sus |
 
-**Espace parent** (bouton 🔒 en bas de l'accueil, protégé par une multiplication) : prénom, sons, plafond et niveaux débloqués, nombre de questions, seuils, lots de la roue avec leurs poids, bons gagnés, suivi de la semaine, calculs à retravailler, **export et import de la sauvegarde**.
+**Accueil** : un gros bouton « Jouer » lance le niveau recommandé ; « Choisir un niveau » affiche les fioles (elles se remplissent avec la maîtrise du niveau).
+
+**Espace parent** (bouton 🔒 en bas de l'accueil, protégé par une multiplication) : prénom, sons, plafond et niveaux débloqués, nombre de questions, seuils, lots de la roue avec leurs poids, bons gagnés, suivi de la semaine, calculs à retravailler, carte des calculs, **export et import de la sauvegarde**.
 
 > 💡 Exportez la sauvegarde de temps en temps : si les données du navigateur sont effacées, la progression est perdue.
 
