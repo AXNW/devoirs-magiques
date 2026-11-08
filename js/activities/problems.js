@@ -1,7 +1,8 @@
 // Activité « Énigmes du grimoire » : petits problèmes illustrés (additions).
-// Le bouton 🔊 lit l'énoncé, utile pour un lecteur débutant.
+// Le bouton 🔊 lit l'énoncé (phrases pré-enregistrées), utile pour un lecteur débutant.
 
 import { h } from '../ui/dom.js';
+import { LINES, storySentence, storyClips } from '../voice/lines.js';
 import { generate as generateAdditions, levelFacts, tenFrames } from './addition.js';
 
 const LEVELS = [
@@ -11,39 +12,9 @@ const LEVELS = [
   { id: 4, label: 'Jusqu’à 20', params: { kind: 'sum', min: 11, max: 20, maxTerm: 10 } },
 ];
 
-const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
-
-// Chaque énoncé : texte, emojis des deux groupes et unité de la réponse.
-export const STORIES = [
-  {
-    text: (a, b) => `Le chat a ${pl(a, 'poisson', 'poissons')}. Il en pêche encore ${b}. Combien de poissons a-t-il en tout ?`,
-    first: '🐟', second: '🐟', unit: 'poissons',
-  },
-  {
-    text: (a, b) => `Dans le chaudron, il y a ${pl(a, 'étoile', 'étoiles')}. On en ajoute ${b}. Combien d’étoiles y a-t-il maintenant ?`,
-    first: '⭐', second: '⭐', unit: 'étoiles',
-  },
-  {
-    text: (a, b) => `${pl(a, 'balai vole', 'balais volent')} dans le ciel. ${pl(b, 'autre balai arrive', 'autres balais arrivent')}. Combien de balais volent en tout ?`,
-    first: '🧹', second: '🧹', unit: 'balais',
-  },
-  {
-    text: (a, b) => `Sur la branche, il y a ${pl(a, 'hibou', 'hiboux')}. ${pl(b, 'hibou vient', 'hiboux viennent')} les rejoindre. Combien de hiboux y a-t-il sur la branche ?`,
-    first: '🦉', second: '🦉', unit: 'hiboux',
-  },
-  {
-    text: (a, b) => `Tu as ${pl(a, 'bonbon magique', 'bonbons magiques')}. Ton ami t’en donne ${b}. Combien de bonbons as-tu maintenant ?`,
-    first: '🍬', second: '🍬', unit: 'bonbons',
-  },
-  {
-    text: (a, b) => `Sur l’étagère, il y a ${pl(a, 'potion bleue', 'potions bleues')} et ${pl(b, 'potion rose', 'potions roses')}. Combien de potions y a-t-il en tout ?`,
-    first: '🧪', second: '⚗️', unit: 'potions',
-  },
-  {
-    text: (a, b) => `Dans le jardin, il y a ${pl(a, 'citrouille', 'citrouilles')}. Il en pousse ${b} de plus. Combien de citrouilles y a-t-il maintenant ?`,
-    first: '🎃', second: '🎃', unit: 'citrouilles',
-  },
-];
+// Les histoires sont dans js/voice/lines.js : chaque phrase y est pré-enregistrée
+// pour chaque nombre de 1 à 10, avec la bonne intonation.
+export const STORIES = LINES.stories;
 
 export function generate(params, opts = {}) {
   const rng = opts.rng ?? Math.random;
@@ -53,7 +24,8 @@ export function generate(params, opts = {}) {
     if (i === last) i = (i + 1) % STORIES.length; // varier les histoires
     last = i;
     const story = STORIES[i];
-    return { ...q, story: i, text: story.text(q.a, q.b), prompt: `${q.a} + ${q.b}` };
+    const text = [storySentence(story, 'first', q.a), storySentence(story, 'second', q.b), story.question].join(' ');
+    return { ...q, story: i, text, prompt: `${q.a} + ${q.b}` };
   });
 }
 
@@ -73,12 +45,12 @@ export function renderQuestion(q, answerEl) {
   return h('div', { class: 'problem' },
     h('p', { class: 'problem-text' }, q.text),
     h('div', { class: 'problem-picture', 'aria-hidden': 'true' },
-      picture(q.a, story.first, 'first'), h('span', { class: 'pic-plus' }, '+'), picture(q.b, story.second, 'second')),
+      picture(q.a, story.emoji1, 'first'), h('span', { class: 'pic-plus' }, '+'), picture(q.b, story.emoji2, 'second')),
     h('div', { class: 'problem-answer' }, 'Réponse : ', answerEl, ` ${story.unit}`));
 }
 
-export function speak(q) {
-  return q.text;
+export function speakClips(q) {
+  return storyClips(STORIES[q.story], q.a, q.b);
 }
 
 export function diagnose(q, input) {
@@ -112,7 +84,7 @@ export default {
   check,
   levelFacts,
   renderQuestion,
-  speak,
+  speakClips,
   diagnose,
   renderHint,
   renderHelp,

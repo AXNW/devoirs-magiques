@@ -8,21 +8,13 @@ import { createProgress } from '../ui/progress.js';
 import { createNumpad } from '../ui/numpad.js';
 import { sparkle } from '../ui/confetti.js';
 import { getState, setState, activityState, maxPlayableLevel } from '../store.js';
-import { applyExerciseResult, applyAbandon, starsFor, rankInfo, isMastered, dailyLimitReached } from '../rewards.js';
+import { applyExerciseResult, applyAbandon, starsFor, isMastered, dailyLimitReached } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
-import { play, speak, canSpeak, stopSpeaking } from '../sound.js';
+import { play, speak, canSpeak, stopSpeaking, hasClips } from '../sound.js';
+import { LINES, line, pickLine, num } from '../voice/lines.js';
 
-// Féliciter l'effort et la méthode plutôt qu'un « talent ».
-const PRAISE = [
-  'Miaou-gique !',
-  'Bravo, tu as bien compté !',
-  'Abracadabra, c’est juste !',
-  'Bien joué !',
-  'Ronron de fierté !',
-  'Tu as pris ton temps, bravo !',
-  'Ça, c’est de l’entraînement !',
-];
-const RETRY = ['Presque ! Essaie encore 💪', 'Pas tout à fait. Recompte doucement !', 'Oups, la potion a fait pschitt… Réessaie !'];
+// Les phrases du chat sont dans js/voice/lines.js (pour pouvoir être pré-enregistrées).
+// Elles félicitent l'effort et la méthode plutôt qu'un « talent ».
 
 // Touche physique → chiffre. Fonctionne en AZERTY sans Maj (rangée du haut)
 // et sur le pavé numérique.
@@ -62,16 +54,14 @@ export function render(root, ctx) {
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
 
   // ---- Interface ----
-  const hatColor = rankInfo(state.wallet.totalStars).rank.hat;
-  const progress = createProgress(count, { hatColor });
-  const talk = createTalkingMascot({ size: 110, hatColor });
+  const progress = createProgress(count);
+  const talk = createTalkingMascot({ size: 110 });
   const answerEl = h('span', { class: 'q-answer', 'aria-live': 'polite' });
-  const listenBtn = canSpeak()
-    ? h('button', {
-      class: 'speak-btn q-speak', type: 'button', 'aria-label': 'Écouter le calcul',
-      onClick: (e) => { e.currentTarget.blur(); const q = questions[index]; speak(activity.speak?.(q) ?? q.prompt); },
-    }, '🔊')
-    : null;
+  // Bouton 🔊 : seulement si la question est entièrement pré-enregistrée.
+  const listenBtn = h('button', {
+    class: 'speak-btn q-speak', type: 'button', 'aria-label': 'Écouter la question', hidden: true,
+    onClick: (e) => { e.currentTarget.blur(); speak(activity.speakClips?.(questions[index])); },
+  }, '🔊');
   const questionEl = h('div', { class: 'question' });
   const feedbackEl = h('div', { class: 'feedback', 'aria-live': 'polite' });
   const helpEl = h('div', { class: 'help-zone' });
@@ -97,6 +87,7 @@ export function render(root, ctx) {
     const q = questions[index];
     // Affichage de la question : format libre fourni par l'activité (terme manquant,
     // addition posée, problème…) ou, par défaut, « prompt = ? ».
+    listenBtn.hidden = !(canSpeak() && hasClips(activity.speakClips?.(q)));
     const custom = activity.renderQuestion?.(q, answerEl);
     questionEl.className = custom ? 'question question-custom' : 'question';
     clear(questionEl).append(...(custom
@@ -111,7 +102,7 @@ export function render(root, ctx) {
     progress.current(index);
     topBar.querySelector('.topbar-count').textContent = `${index + 1} / ${count}`;
     renderInput();
-    if (index === 0) talk.say('Écris le résultat, puis appuie sur Entrée ✔');
+    if (index === 0) talk.say(line('exercise', 'start'));
   }
 
   function renderInput() {
@@ -161,8 +152,10 @@ export function render(root, ctx) {
       progress.combo(combo >= 3);
       questionEl.classList.add('correct');
       feedbackEl.className = 'feedback good';
-      feedbackEl.textContent = attempt === 1 ? `${pick(PRAISE)} +1 ⭐` : 'Bien rattrapé ! +½ ⭐';
-      talk.say(combo >= 3 ? `${combo} bonnes réponses d’affilée ! La boule de cristal brille 🔮` : pick(PRAISE));
+      feedbackEl.textContent = attempt === 1 ? `${pick(LINES.praise)} +1 ⭐` : 'Bien rattrapé ! +½ ⭐';
+      talk.say(combo >= 3
+        ? { text: `${combo} ${LINES.exercise.combo}`, clips: [num(combo), 'exercise_combo'] }
+        : pickLine('praise'));
       talk.mood('happy');
       play('correct', { combo });
       sparkle(answerEl, combo >= 3 ? 22 : 12);
@@ -180,8 +173,8 @@ export function render(root, ctx) {
       input = '';
       renderInput();
       feedbackEl.className = 'feedback retry';
-      feedbackEl.textContent = hint ?? pick(RETRY);
-      talk.say(hint ? 'Essaie encore, tu y es presque 🐾' : 'Prends ton temps, tu peux compter sur tes doigts 🐾');
+      feedbackEl.textContent = hint ?? pick(LINES.retry);
+      talk.say(line('exercise', hint ? 'almost' : 'take_time'));
       const visual = activity.renderHint?.(q);
       if (visual) clear(helpEl).append(visual);
       return;
@@ -199,9 +192,7 @@ export function render(root, ctx) {
     questionEl.classList.add('retype');
     feedbackEl.className = 'feedback retry';
     feedbackEl.textContent = 'Regarde, on le fait ensemble 👇 puis écris la réponse.';
-    talk.say(hardInARow >= 2
-      ? 'Respire un grand coup 🌬️ On apprend ensemble, tu vas y arriver !'
-      : 'Ce n’est pas grave, c’est comme ça qu’on apprend !');
+    talk.say(line('exercise', hardInARow >= 2 ? 'breathe' : 'not_bad'));
     clear(helpEl).append(activity.renderHelp(q));
   }
 

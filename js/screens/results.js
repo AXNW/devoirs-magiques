@@ -5,17 +5,12 @@ import { createTalkingMascot } from '../ui/mascot.js';
 import { celebrate } from '../ui/confetti.js';
 import { icon } from '../ui/icons.js';
 import { getState } from '../store.js';
-import { gemProgress, rankInfo } from '../rewards.js';
+import { gemProgress, hatColorFor } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
 import { play } from '../sound.js';
+import { LINES, line, num } from '../voice/lines.js';
 
-// Valoriser l'effort et les progrès, quel que soit le résultat.
-const MESSAGES = [
-  'Bravo, la potion est terminée ! On s’entraîne encore un peu ?',
-  'Bien joué, tu progresses !',
-  'Très bien ! Ton entraînement paie !',
-  'Un sans-faute ! Tout ce travail a payé !',
-];
+// Les messages (qui valorisent l'effort, quel que soit le résultat) sont dans js/voice/lines.js.
 
 export function render(root, ctx) {
   const r = ctx.session.lastResult;
@@ -25,16 +20,16 @@ export function render(root, ctx) {
   const gem = gemProgress(s);
   const canSpin = s.wallet.gems >= s.settings.gemsPerSpin;
 
-  const talk = createTalkingMascot({ size: 130, hatColor: rankInfo(s.wallet.totalStars).rank.hat });
-  if (r.limitReached) talk.say('C’était la dernière potion d’aujourd’hui. Bravo, et à demain ! 😴');
-  else if (r.pauseHint) talk.say(`${r.today} potions aujourd’hui ! Ton chat bâille un peu 😴 On fait une pause ?`);
-  else if (r.suggestEasier) talk.say('Celui-là était difficile ! Et si on s’échauffait un peu ?');
-  else talk.say(MESSAGES[r.hats]);
+  const talk = createTalkingMascot({ size: 130 });
+  if (r.limitReached) talk.say(line('results_extra', 'limit'));
+  else if (r.pauseHint) talk.say({ text: `${r.today} ${LINES.results_extra.pause}`, clips: [num(r.today), 'results_extra_pause'] });
+  else if (r.suggestEasier) talk.say(line('results_extra', 'easier'));
+  else talk.say(line('results', r.hats));
   if (r.hats >= 2) talk.mood('happy', 3000);
 
   const hats = h('div', { class: 'hats', 'aria-label': `${r.hats} chapeaux sur 3` },
     [1, 2, 3].map((n) => {
-      const el = icon('hat', { size: '5rem', color: rankInfo(s.wallet.totalStars).rank.hat, className: `hat ${n <= r.hats ? 'on' : 'off'}` });
+      const el = icon('hat', { size: '5rem', color: hatColorFor(s), className: `hat ${n <= r.hats ? 'on' : 'off'}` });
       el.style.animationDelay = `${n * 0.25}s`;
       return el;
     }));
@@ -44,6 +39,9 @@ export function render(root, ctx) {
   if (r.levelUnlocked) news.push(h('div', { class: 'news' }, `🔓 Nouveau niveau débloqué : ${r.levelUnlocked.label} !`));
   if (r.rankUp) news.push(h('div', { class: 'news' }, `🎩 Tu deviens ${r.rankUp.name} !`));
   for (const f of r.newFamiliars) news.push(h('div', { class: 'news' }, `${f.emoji} Nouveau familier : ${f.name} !`));
+  for (const it of r.newItems ?? []) {
+    news.push(h('button', { class: 'news news-btn', onClick: () => ctx.navigate('#/mon-chat') }, `🎨 Nouveau pour ton chat : ${it.label} ! Essayer →`));
+  }
   const playable = !r.limitReached;
 
   root.append(

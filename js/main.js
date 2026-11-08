@@ -1,6 +1,7 @@
 // Point d'entrée : routeur par hash (#/accueil, #/exercice/addition/2, ...).
 
 import { load } from './store.js';
+import { loadIndex } from './voice/clips.js';
 import * as home from './screens/home.js';
 import * as exercise from './screens/exercise.js';
 import * as results from './screens/results.js';
@@ -41,6 +42,8 @@ function router() {
 }
 
 load();
+// Index des voix enregistrées (rapide, et en cache hors ligne) : on l'attend au plus 1,5 s.
+await Promise.race([loadIndex(), new Promise((r) => setTimeout(r, 1500))]);
 window.addEventListener('hashchange', router);
 router();
 

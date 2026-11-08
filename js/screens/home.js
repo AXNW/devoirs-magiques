@@ -1,19 +1,14 @@
 // Accueil : un gros bouton « Jouer », la mascotte, et le reste en retrait.
 
-import { h, pick } from '../ui/dom.js';
+import { h } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
 import { getState, update, activityState, maxPlayableLevel } from '../store.js';
 import { rankInfo, gemProgress, levelMastery, levelProgress, dailyLimitReached, recommendedActivity } from '../rewards.js';
 import { ACTIVITIES } from '../activities/registry.js';
 import { FAMILIARS } from '../config.js';
 import { play } from '../sound.js';
+import { line, pickLine, catNameKey } from '../voice/lines.js';
 
-const GREETINGS = [
-  'On fait un peu de magie ?',
-  'Mes moustaches frétillent : c’est l’heure des potions !',
-  'Une petite potion avec moi ?',
-  'Miaou ! Un nouveau sortilège aujourd’hui ?',
-];
 const LIQUIDS = ['#9b6dff', '#3f8efc', '#2bb673', '#ffcf4a', '#ff7eb6', '#ff7a1a', '#14b8c4', '#e0457b', '#7b5cd6', '#4ee1a0'];
 
 // Le panneau des niveaux reste ouvert si l'enfant l'a ouvert pendant cette visite.
@@ -49,12 +44,17 @@ export function render(root, ctx) {
   );
 
   // ---- Mascotte ----
-  const talk = createTalkingMascot({ size: 170, hatColor: rank.rank.hat });
+  const talk = createTalkingMascot({ size: 170 });
   const name = s.profile.name.trim();
   const catName = s.profile.cat.name || 'Moustache';
-  talk.say(resting
-    ? 'Les potions se reposent jusqu’à demain 😴 Tu peux regarder ton grimoire et tes familiers !'
-    : `${name ? `Bonjour ${name} ! ` : 'Bonjour ! '}C’est moi, ${catName}. ${pick(GREETINGS)}`);
+  // Le prénom de l'enfant s'affiche mais n'est pas prononcé (il n'est jamais enregistré).
+  // Le nom du chat est prononcé s'il fait partie des noms enregistrés.
+  const greet = pickLine('greetings');
+  const nameKey = catNameKey(catName);
+  talk.say(resting ? line('home', 'resting') : {
+    text: `${name ? `Bonjour ${name} ! ` : 'Bonjour ! '}C’est moi, ${catName}. ${greet.text}`,
+    clips: nameKey ? ['home_hello', 'home_its_me', nameKey, ...greet.clips] : ['home_hello_generic', ...greet.clips],
+  });
 
   // ---- Gros bouton Jouer ----
   const activity = recommendedActivity(s, ACTIVITIES);

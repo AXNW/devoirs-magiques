@@ -1,6 +1,7 @@
 // Petits sons générés avec la Web Audio API (aucun fichier audio).
 
 import { getState } from './store.js';
+import { playClips, stopClips, hasClips as clipsExist } from './voice/clips.js';
 
 let ctx = null;
 
@@ -63,85 +64,27 @@ export function play(name, { combo = 0 } = {}) {
   }
 }
 
-// ---- Lecture à voix haute (synthèse vocale du navigateur) -----------------
-// La qualité dépend des voix installées. On choisit automatiquement la plus naturelle :
-// voix « Natural / Online » d'Edge, puis « Google français » de Chrome, puis les voix système.
+// ---- Voix du chat (enregistrements uniquement, voir js/voice/) ------------
+// Pour que la voix reste cohérente, seules les phrases pré-enregistrées sont lues :
+// pas de synthèse vocale du navigateur.
 
-const hasSynth = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
-let voices = [];
-
-function loadVoices() {
-  voices = window.speechSynthesis.getVoices();
-}
-if (hasSynth()) {
-  loadVoices();
-  // Les voix arrivent souvent après le chargement de la page.
-  window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+// Tous ces enregistrements existent-ils ?
+export function hasClips(keys) {
+  return clipsExist(keys);
 }
 
-export function voiceScore(v) {
-  const name = v.name.toLowerCase();
-  let score = 0;
-  if (/natural|neural|naturelle/.test(name)) score += 100;
-  if (/online/.test(name)) score += 40;
-  if (/google/.test(name)) score += 50;
-  if (/premium|enhanced|améliorée/.test(name)) score += 30;
-  if (/^fr[-_]fr/i.test(v.lang)) score += 10;
-  if (v.localService === false) score += 5;
-  return score;
-}
-
-// Voix françaises, de la plus naturelle à la plus robotique.
-export function frenchVoices() {
-  return voices.filter((v) => /^fr/i.test(v.lang)).sort((a, b) => voiceScore(b) - voiceScore(a));
-}
-
-export function onVoicesChanged(fn) {
-  if (hasSynth()) window.speechSynthesis.addEventListener?.('voiceschanged', fn);
-  return () => window.speechSynthesis?.removeEventListener?.('voiceschanged', fn);
-}
-
-function chosenVoice() {
-  const wanted = getState().settings.voiceName;
-  const list = frenchVoices();
-  return list.find((v) => v.name === wanted) ?? list[0] ?? null;
-}
-
-// Les boutons 🔊 s'affichent si le navigateur sait parler et que la voix n'est pas désactivée.
+// Les boutons 🔊 s'affichent si la voix n'est pas désactivée par le parent
+// et que les enregistrements demandés existent (vérifier avec hasClips).
 export function canSpeak() {
-  return hasSynth() && getState().settings.voiceEnabled !== false;
+  return getState().settings.voiceEnabled !== false && !!(window.AudioContext || window.webkitAudioContext);
 }
 
-function say(text) {
-  if (!hasSynth() || !text) return;
-  const clean = text
-    .replace(/\p{Extended_Pictographic}|️|‍/gu, '')
-    .replace(/\+/g, ' plus ')
-    .replace(/×/g, ' fois ')
-    .replace(/=/g, ' égale ')
-    .replace(/½/g, ' une demie ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const u = new SpeechSynthesisUtterance(clean);
-  const voice = chosenVoice();
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang ?? 'fr-FR';
-  u.rate = Number(getState().settings.voiceRate) || 1;
-  u.pitch = 1; // une hauteur modifiée rend les voix plus artificielles
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-}
-
-// Toujours déclenchée par un clic de l'enfant : elle fonctionne même si les sons sont coupés.
-export function speak(text) {
-  if (canSpeak()) say(text);
-}
-
-// Pour le bouton « Tester » de l'Espace parent (même si la voix est désactivée).
-export function testVoice() {
-  say('Bonjour ! Je suis ton chat sorcier. Combien font 3 plus 4 ?');
+// Toujours déclenchée par un clic de l'enfant (fonctionne même si les petits sons sont coupés).
+export async function speak(clips) {
+  if (!canSpeak() || !clips?.length) return;
+  await playClips(audio(), clips);
 }
 
 export function stopSpeaking() {
-  if (hasSynth()) window.speechSynthesis.cancel();
+  stopClips();
 }

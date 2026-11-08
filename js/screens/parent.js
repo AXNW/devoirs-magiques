@@ -4,7 +4,9 @@ import { h, clear, toast, formatDate } from '../ui/dom.js';
 import { getState, update, activityState, exportJson, importJson, resetAll } from '../store.js';
 import { hatsFor, levelMastery, isMastered } from '../rewards.js';
 import { ACTIVITIES } from '../activities/registry.js';
-import { frenchVoices, voiceScore, onVoicesChanged, testVoice } from '../sound.js';
+import { speak } from '../sound.js';
+import { clipCount } from '../voice/clips.js';
+import { allClips, pickLine } from '../voice/lines.js';
 
 const clampInt = (v, min, max) => Math.min(max, Math.max(min, parseInt(v, 10) || min));
 
@@ -99,42 +101,26 @@ function profileSection(s) {
   );
 }
 
-let stopVoiceWatch = () => {};
-
+// Voix du chat : uniquement des enregistrements (audio/voice, générés avec tools/generate_voice.py).
 function voiceSection(s) {
-  const select = h('select', {
-    class: 'field voice-select',
-    onChange: (e) => { update((st) => { st.settings.voiceName = e.target.value; }); saved(); testVoice(); },
+  const status = h('small', { class: 'muted block' }, '…');
+  const total = allClips().length;
+  clipCount().then((n) => {
+    status.textContent = n >= total
+      ? `${n} / ${total} phrases enregistrées : tout est prêt.`
+      : n
+        ? `${n} / ${total} phrases enregistrées. Relancez tools/generate_voice.py pour compléter (les phrases manquantes restent muettes).`
+        : 'Aucun enregistrement pour l’instant (voir le README, « Voix pré-enregistrées »).';
   });
-  const note = h('p', { class: 'muted small' });
-  const fill = () => {
-    const list = frenchVoices();
-    const current = getState().settings.voiceName;
-    select.replaceChildren(
-      h('option', { value: '', selected: !current }, 'Automatique (la plus naturelle)'),
-      ...list.map((v) => h('option', { value: v.name, selected: v.name === current },
-        `${v.name}${voiceScore(v) >= 50 ? ' ★' : ''}`)));
-    note.textContent = list.some((v) => voiceScore(v) >= 50)
-      ? '★ = voix naturelle (meilleure qualité). Certaines ont besoin d’Internet.'
-      : 'Aucune voix naturelle trouvée sur ce navigateur. Les voix « Natural » d’Edge sont les plus agréables : utilisez Edge (ou installez l’application depuis Edge).';
-  };
-  fill();
-  stopVoiceWatch();
-  stopVoiceWatch = onVoicesChanged(fill);
-  return section('🔊 Voix',
-    h('label', { class: 'row' },
-      h('span', {}, 'Boutons de lecture à voix haute', h('small', { class: 'muted block' }, 'Décocher pour masquer tous les boutons 🔊.')),
-      h('input', { type: 'checkbox', checked: s.settings.voiceEnabled !== false, onChange: (e) => { update((st) => { st.settings.voiceEnabled = e.target.checked; }); saved(); } })),
-    h('label', { class: 'row' }, h('span', {}, 'Voix'), select),
-    h('label', { class: 'row' },
-      h('span', {}, 'Vitesse'),
-      h('select', {
-        class: 'field',
-        onChange: (e) => { update((st) => { st.settings.voiceRate = Number(e.target.value); }); saved(); testVoice(); },
-      },
-      [['0.8', 'Lente'], ['0.95', 'Normale'], ['1.1', 'Rapide']].map(([v, l]) =>
-        h('option', { value: v, selected: Number(v) === Number(s.settings.voiceRate) }, l)))),
-    h('div', { class: 'row' }, note, h('button', { class: 'btn small', onClick: testVoice }, '▶️ Tester')),
+  return section('🔊 Voix du chat',
+    h('div', { class: 'row' },
+      h('span', {}, 'Lecture à voix haute (boutons 🔊)', status),
+      h('span', { class: 'inline' },
+        h('button', { class: 'btn btn-soft small', type: 'button', 'aria-label': 'Écouter un exemple', onClick: () => speak(pickLine('praise').clips) }, '▶️'),
+        h('input', {
+          type: 'checkbox', 'aria-label': 'Activer la voix du chat', checked: s.settings.voiceEnabled !== false,
+          onChange: (e) => { update((st) => { st.settings.voiceEnabled = e.target.checked; }); saved(); },
+        }))),
   );
 }
 

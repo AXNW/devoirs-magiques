@@ -2,6 +2,7 @@
 // Elle prépare la soustraction. Elle réutilise les calculs de l'addition.
 
 import { h } from '../ui/dom.js';
+import { num } from '../voice/lines.js';
 import { generate as generateAdditions, levelFacts, tenFrames, numberLine, renderGrimoire } from './addition.js';
 
 const LEVELS = [
@@ -46,8 +47,10 @@ export function renderQuestion(q, answerEl) {
     part(q.sum));
 }
 
-export function speak(q) {
-  return q.hideFirst ? `Combien plus ${q.b} égale ${q.sum} ?` : `${q.a} plus combien égale ${q.sum} ?`;
+export function speakClips(q) {
+  return q.hideFirst
+    ? ['words_combien_plus', num(q.b), 'words_egale', num(q.sum)]
+    : [num(q.a), 'words_plus_combien_egale', num(q.sum)];
 }
 
 export function diagnose(q, input) {
@@ -85,7 +88,7 @@ export default {
   check,
   levelFacts,
   renderQuestion,
-  speak,
+  speakClips,
   diagnose,
   renderHint,
   renderHelp,

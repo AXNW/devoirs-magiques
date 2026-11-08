@@ -3,6 +3,7 @@
 
 import { randInt, shuffle, weightedPick } from '../rng.js';
 import { h } from '../ui/dom.js';
+import { num } from '../voice/lines.js';
 
 // ⚠️ Les numéros de niveau sont enregistrés dans les sauvegardes : pour en insérer
 // un, ajouter une migration dans store.js (voir la migration 2).
@@ -166,9 +167,9 @@ export function diagnose(q, input) {
   return null;
 }
 
-// Phrase lue à voix haute par le bouton 🔊.
-export function speak(q) {
-  return `Combien font ${q.a} plus ${q.b} ?`;
+// Enregistrements à enchaîner pour la voix pré-enregistrée (voir js/voice/lines.js).
+export function speakClips(q) {
+  return ['words_combien_font', num(q.a), 'words_plus', num(q.b)];
 }
 
 // ---- Représentations visuelles --------------------------------------------
@@ -306,7 +307,7 @@ export default {
   check,
   levelFacts,
   diagnose,
-  speak,
+  speakClips,
   renderQuestion,
   renderHint,
   renderHelp,
