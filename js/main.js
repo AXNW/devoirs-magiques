@@ -7,6 +7,7 @@ import * as results from './screens/results.js';
 import * as wheel from './screens/wheel.js';
 import * as parent from './screens/parent.js';
 import * as collection from './screens/collection.js';
+import * as grimoire from './screens/grimoire.js';
 
 const routes = {
   accueil: home,
@@ -15,6 +16,7 @@ const routes = {
   roue: wheel,
   parent,
   familiers: collection,
+  grimoire,
 };
 
 const session = { lastResult: null, parentOk: false };

@@ -40,15 +40,18 @@ Chaque `git push` met le site à jour en une minute environ. La progression de l
 
 | Élément | Règle (modifiable dans l'Espace parent) |
 |---|---|
-| Exercice | 10 questions. Un 2e essai en cas d'erreur, puis une aide visuelle et l'enfant recopie la réponse |
+| Exercice | 10 questions. Après une 1re erreur : un message ciblé et un indice de stratégie (ligne numérique, « complète jusqu'à 10 »). Après la 2e : aide avec des boîtes de 10, puis l'enfant recopie la réponse |
 | Étoiles ⭐ | 1 par bonne réponse du premier coup, ½ au 2e essai |
 | Chapeaux 🎩 | 3 = sans faute, 2 = au moins 80 %, 1 = au moins 60 % |
 | Exercice réussi | au moins 1 chapeau |
 | Gemme de lune 💎 | 10 exercices réussis = 1 gemme = 1 tour de Roue du Destin |
-| Niveaux | 3 exercices à 3 chapeaux débloquent le niveau suivant, **sans dépasser le plafond** fixé par le parent |
+| Calcul « su » | réussi 3 fois d'affilée du premier coup. Les calculs sus s'écrivent en or dans le **grimoire** (table d'addition) |
+| Niveaux | le niveau suivant s'ouvre quand 80 % de ses calculs sont sus **ou** après 3 sans-fautes, **sans dépasser le plafond** fixé par le parent |
+| Anti-frustration | après 2 exercices difficiles d'affilée, le chat propose de s'échauffer au niveau précédent |
+| Rythme | le chat propose une pause tous les 3 exercices ; une limite quotidienne est réglable (désactivée par défaut) |
 | Rangs | selon le total d'étoiles : Chaton apprenti → Apprenti sorcier → Mage → Grand mage → Archimage |
 | Familiers 🐾 | des cartes à collectionner, débloquées par paliers |
-| Révisions | les calculs ratés reviennent plus souvent dans les exercices suivants |
+| Révisions | les calculs ratés reviennent en priorité, puis ceux pas encore sus, avec quelques révisions de calculs sus |
 
 **Espace parent** (bouton 🔒 en bas de l'accueil, protégé par une multiplication) : prénom, sons, plafond et niveaux débloqués, nombre de questions, seuils, lots de la roue avec leurs poids, bons gagnés, suivi de la semaine, calculs à retravailler, **export et import de la sauvegarde**.
 
@@ -84,9 +87,15 @@ tests/                   tests (navigateur ou Node)
      levels: [{ id: 1, label: 'Jusqu’à 5', params: { max: 5 } }, /* … */],
      defaultCeiling: 1,
      maxInputLength: 2,
-     generate(params, { rng, count, missed }) { /* → [{ prompt, answer, key, ... }] */ },
+     generate(params, { rng, count, missed, isMastered }) { /* → [{ prompt, answer, key, ... }] */ },
      check(question, input) { /* → true / false */ },
      renderHelp(question) { /* → élément HTML affiché après 2 erreurs */ },
+     // Facultatif :
+     levelFacts(params) { /* → liste des clés de calcul du niveau (maîtrise), ou null */ },
+     diagnose(question, input) { /* → message pour une erreur typique, ou null */ },
+     renderHint(question) { /* → indice de stratégie après la 1re erreur */ },
+     speak(question) { /* → phrase lue par le bouton 🔊 */ },
+     renderGrimoire(actState, { isMastered }) { /* → page du grimoire */ },
    };
    ```
 2. L'ajouter dans `js/activities/registry.js`.

@@ -2,7 +2,7 @@
 
 import { h, clear, toast, formatDate } from '../ui/dom.js';
 import { getState, update, activityState, exportJson, importJson, resetAll } from '../store.js';
-import { hatsFor } from '../rewards.js';
+import { hatsFor, levelMastery } from '../rewards.js';
 import { ACTIVITIES } from '../activities/registry.js';
 
 const clampInt = (v, min, max) => Math.min(max, Math.max(min, parseInt(v, 10) || min));
@@ -70,6 +70,7 @@ function renderPanel(root, ctx) {
     h('div', { class: 'parent' },
       profileSection(s),
       activitiesSection(s),
+      rhythmSection(s),
       rewardsSection(s, rerender),
       prizesSection(s, rerender),
       wheelHistorySection(s),
@@ -110,14 +111,32 @@ function activitiesSection(s) {
       h('label', { class: 'row' },
         h('span', {}, 'Niveaux débloqués jusqu’à', h('small', { class: 'muted block' }, 'Se débloque tout seul avec les exercices à 3 chapeaux. Le plafond reste la limite.')),
         h('select', { class: 'field', onChange: (e) => setAct((a) => { a.unlocked = Number(e.target.value); }) }, options(act.unlocked))),
+      h('div', { class: 'mastery-list' },
+        activity.levels.filter((l) => l.id <= act.ceiling).map((l) => {
+          const m = levelMastery(act, activity, l.id, s.settings.masteryToUnlock);
+          return h('p', { class: 'small' }, `Niveau ${l.id} (${l.label}) : `,
+            m ? `${m.mastered} / ${m.total} calculs sus` : `${act.perfects[l.id] || 0} sans-faute(s)`);
+        })),
     );
   });
   return section('🧪 Activités et difficulté',
     numberRow('Questions par exercice', s.settings.questionsPerExercise, 3, 30,
       (v) => update((st) => { st.settings.questionsPerExercise = v; })),
-    numberRow('Exercices à 3 chapeaux pour débloquer un niveau', s.settings.perfectsToUnlock, 1, 20,
+    numberRow('% de calculs sus pour débloquer un niveau', s.settings.masteryToUnlock, 10, 100,
+      (v) => update((st) => { st.settings.masteryToUnlock = v; }),
+      'Un calcul est « su » après 3 réussites du premier coup d’affilée.'),
+    numberRow('… ou nombre de sans-fautes pour débloquer un niveau', s.settings.perfectsToUnlock, 1, 20,
       (v) => update((st) => { st.settings.perfectsToUnlock = v; })),
     blocks,
+  );
+}
+
+function rhythmSection(s) {
+  return section('⏰ Rythme',
+    numberRow('Proposer une pause tous les N exercices', s.settings.dailyPauseHint, 0, 20,
+      (v) => update((st) => { st.settings.dailyPauseHint = v; }), '0 = jamais. C’est une simple suggestion du chat.'),
+    numberRow('Nombre maximum d’exercices par jour', s.settings.dailyLimit, 0, 50,
+      (v) => update((st) => { st.settings.dailyLimit = v; }), '0 = illimité. Une fois la limite atteinte, les potions « se reposent » jusqu’au lendemain.'),
   );
 }
 

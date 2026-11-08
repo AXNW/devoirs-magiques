@@ -4,16 +4,19 @@
 import { randInt, shuffle, weightedPick } from '../rng.js';
 import { h } from '../ui/dom.js';
 
+// ⚠️ Les numéros de niveau sont enregistrés dans les sauvegardes : pour en insérer
+// un, ajouter une migration dans store.js (voir la migration 2).
 const LEVELS = [
-  { id: 1, label: 'Jusqu’à 5',               params: { kind: 'sum', max: 5 } },
-  { id: 2, label: 'Jusqu’à 7',               params: { kind: 'sum', max: 7 } },
-  { id: 3, label: 'Jusqu’à 10',              params: { kind: 'sum', max: 10 } },
-  { id: 4, label: 'Doubles et amis de 10',   params: { kind: 'friends' } },
-  { id: 5, label: 'Jusqu’à 15',              params: { kind: 'sum', min: 6, max: 15 } },
-  { id: 6, label: 'Jusqu’à 20',              params: { kind: 'sum', min: 10, max: 20 } },
-  { id: 7, label: 'Dizaines + unités (23 + 4)', params: { kind: 'two', second: 'one', carry: false } },
-  { id: 8, label: 'Grands nombres (23 + 14)',   params: { kind: 'two', second: 'two', carry: false } },
-  { id: 9, label: 'Avec retenue (27 + 15)',     params: { kind: 'two', second: 'any', carry: true } },
+  { id: 1,  label: 'Jusqu’à 5',                  params: { kind: 'sum', max: 5 } },
+  { id: 2,  label: 'Jusqu’à 7',                  params: { kind: 'sum', max: 7 } },
+  { id: 3,  label: 'Jusqu’à 10',                 params: { kind: 'sum', max: 10 } },
+  { id: 4,  label: 'Doubles et amis de 10',      params: { kind: 'friends' } },
+  { id: 5,  label: 'Passer la dizaine (8 + 5)',  params: { kind: 'sum', min: 11, max: 18, maxTerm: 9 } },
+  { id: 6,  label: 'Jusqu’à 15',                 params: { kind: 'sum', min: 6, max: 15 } },
+  { id: 7,  label: 'Jusqu’à 20',                 params: { kind: 'sum', min: 10, max: 20 } },
+  { id: 8,  label: 'Dizaines + unités (23 + 4)', params: { kind: 'two', second: 'one', carry: false } },
+  { id: 9,  label: 'Grands nombres (23 + 14)',   params: { kind: 'two', second: 'two', carry: false } },
+  { id: 10, label: 'Avec retenue (27 + 15)',     params: { kind: 'two', second: 'any', carry: true } },
 ];
 
 // Clé indépendante de l'ordre : 3+4 et 4+3 sont le même calcul.
@@ -25,8 +28,9 @@ export function buildPool(params) {
   const pool = [];
   if (params.kind === 'sum') {
     const min = params.min ?? 0;
-    for (let a = 0; a <= params.max; a++) {
-      for (let b = 0; b <= params.max; b++) {
+    const maxTerm = params.maxTerm ?? params.max;
+    for (let a = 0; a <= maxTerm; a++) {
+      for (let b = 0; b <= maxTerm; b++) {
         const s = a + b;
         if (s > params.max || s < min || (a === 0 && b === 0)) continue;
         if (min > 0 && (a === 0 || b === 0)) continue;
@@ -50,6 +54,13 @@ export function buildPool(params) {
   return pool;
 }
 
+// Liste des calculs d'un niveau, pour suivre la maîtrise calcul par calcul.
+// null quand le niveau en contient trop (nombres à 2 chiffres) : on se base alors sur les sans-fautes.
+export function levelFacts(params) {
+  if (params.kind === 'two') return null;
+  return [...new Set(buildPool(params).map(([a, b]) => keyOf(a, b)))];
+}
+
 function makeQuestion(a, b) {
   return { a, b, prompt: `${a} + ${b}`, answer: a + b, key: keyOf(a, b) };
 }
@@ -57,11 +68,12 @@ function makeQuestion(a, b) {
 /**
  * Génère `count` questions pour un niveau.
  * - les calculs ratés récemment (`missed`) reviennent en priorité (30 % max) ;
+ * - puis les calculs pas encore sus, avec quelques calculs sus en révision ;
  * - pas de doublon tant que le niveau offre assez de calculs différents ;
- * - « + 0 » limité ;
+ * - « + 0 » limité, jamais deux fois le même calcul d'affilée ;
  * - l'ordre des termes varie (3 + 4 ou 4 + 3).
  */
-export function generate(params, { rng = Math.random, count = 10, missed = {} } = {}) {
+export function generate(params, { rng = Math.random, count = 10, missed = {}, isMastered = () => false } = {}) {
   const variants = new Map();
   for (const [a, b] of buildPool(params)) {
     const k = keyOf(a, b);
@@ -91,11 +103,21 @@ export function generate(params, { rng = Math.random, count = 10, missed = {} } 
     take(missedKeys.splice(i, 1)[0]);
   }
 
-  // 2) Compléter au hasard (on autorise les répétitions si le niveau est petit).
-  let candidates = shuffle(rng, keys.filter((k) => !used.has(k)));
+  // 2) Calculs pas encore sus d'abord, en gardant au moins 2 révisions de calculs sus.
+  const rest = keys.filter((k) => !used.has(k));
+  const fresh = shuffle(rng, rest.filter((k) => !isMastered(k)));
+  const known = shuffle(rng, rest.filter((k) => isMastered(k)));
+  const slots = count - chosen.length;
+  const review = Math.min(known.length, slots, Math.max(2, slots - fresh.length));
+  let queue = [
+    ...fresh.slice(0, slots - review), ...known.slice(0, review),
+    ...fresh.slice(slots - review), ...known.slice(review),
+  ];
+
+  // 3) Compléter (on autorise les répétitions si le niveau est petit).
   while (chosen.length < count) {
-    if (!candidates.length) candidates = shuffle(rng, keys);
-    const k = candidates.pop();
+    if (!queue.length) queue = shuffle(rng, keys);
+    const k = queue.shift();
     if (hasZero(k) && zeros >= maxZeros && hasNonZero) continue;
     take(k);
   }
@@ -149,22 +171,69 @@ export function speak(q) {
   return `Combien font ${q.a} plus ${q.b} ?`;
 }
 
-// Aide visuelle après deux erreurs.
+// ---- Représentations visuelles --------------------------------------------
+
+// Boîtes de 10 (2 rangées de 5), comme en classe. `groups` = [{ n, cls }].
+export function tenFrames(groups, { highlightEmpty = false } = {}) {
+  const cells = [];
+  for (const g of groups) for (let i = 0; i < g.n; i++) cells.push(g.cls);
+  const frames = Math.max(1, Math.ceil(cells.length / 10));
+  return h('div', { class: 'tenframes' },
+    Array.from({ length: frames }, (_, f) => h('div', { class: 'tenframe' },
+      Array.from({ length: 10 }, (_, i) => {
+        const cls = cells[f * 10 + i];
+        return h('span', { class: `cell ${cls ?? (highlightEmpty ? 'gap' : 'empty')}` });
+      }))));
+}
+
+// Ligne numérique : le chat part du plus grand nombre et fait des bonds.
+function numberLine(start, hops) {
+  const from = Math.max(0, start - 2);
+  const to = start + hops + 2;
+  const cells = [];
+  for (let n = from; n <= to; n++) {
+    const isStart = n === start;
+    const isHop = n > start && n <= start + hops;
+    cells.push(h('div', { class: `nl-cell ${isStart ? 'start' : ''} ${isHop ? 'hop' : ''}` },
+      h('span', { class: 'nl-mark' }, isStart ? '🐈' : isHop ? '🐾' : ''),
+      h('span', { class: 'nl-num' }, n)));
+  }
+  return h('div', { class: 'numline' }, cells);
+}
+
+// Indice après la 1re erreur : une stratégie, sans donner la réponse.
+export function renderHint(q) {
+  const big = Math.max(q.a, q.b);
+  const small = Math.min(q.a, q.b);
+
+  if (small === 0) {
+    return h('div', { class: 'hint' }, h('p', {}, 'Astuce : ajouter 0, c’est n’ajouter rien du tout !'));
+  }
+  if (q.a >= 10 && q.answer > 20) {
+    return h('div', { class: 'hint' },
+      h('p', {}, `Astuce : commence par les unités (${q.a % 10} + ${q.b % 10}), puis les dizaines.`));
+  }
+  if (big <= 9 && q.answer > 10) {
+    return h('div', { class: 'hint' },
+      h('p', {}, `Astuce : complète d’abord jusqu’à 10 ! Il manque ${10 - big} pour remplir la boîte, ensuite il reste ${small - (10 - big)}.`),
+      tenFrames([{ n: big, cls: 'a' }], { highlightEmpty: true }));
+  }
+  if (q.answer <= 20) {
+    return h('div', { class: 'hint' },
+      h('p', {}, `Astuce : mets ${big} dans ta tête et avance de ${small}. Où arrive le chat ?`),
+      numberLine(big, small));
+  }
+  return null;
+}
+
+// Aide complète après la 2e erreur (avec la réponse).
 export function renderHelp(q) {
-  if (q.a <= 10 && q.b <= 10) {
-    const group = (n, emoji) => {
-      const chunks = [];
-      for (let i = 0; i < n; i += 5) {
-        chunks.push(h('span', { class: 'chunk' }, emoji.repeat(Math.min(5, n - i))));
-      }
-      return h('span', { class: 'group' }, n === 0 ? h('span', { class: 'chunk empty' }, 'rien') : chunks);
-    };
+  if (q.answer <= 20 && q.a <= 20 && q.b <= 20) {
     return h('div', { class: 'help help-count' },
-      h('p', {}, 'Compte tous les poissons :'),
-      h('div', { class: 'help-line' },
-        group(q.a, '🐟'), h('span', { class: 'op' }, '+'), group(q.b, '🐠'),
-        h('span', { class: 'op' }, '='), h('strong', { class: 'help-answer' }, q.answer)),
-    );
+      h('p', {}, `${q.a} jetons violets et ${q.b} jetons dorés :`),
+      tenFrames([{ n: q.a, cls: 'a' }, { n: q.b, cls: 'b' }]),
+      q.answer > 10 ? h('p', {}, `Une boîte pleine, c’est 10. 10 + ${q.answer - 10} = ${q.answer}`) : null,
+      h('p', { class: 'help-result' }, `${q.a} + ${q.b} = `, h('strong', { class: 'help-answer' }, q.answer)));
   }
 
   const ta = Math.floor(q.a / 10), ua = q.a % 10;
@@ -181,6 +250,32 @@ export function renderHelp(q) {
   return h('div', { class: 'help help-columns' }, lines);
 }
 
+// Page du grimoire : la table d'addition. Un calcul su y apparaît en doré avec son résultat.
+export function renderGrimoire(act, { isMastered }) {
+  const allowed = LEVELS.filter((l) => l.id <= act.ceiling);
+  const maxSum = Math.max(5, ...allowed.map((l) => (l.params.kind === 'sum' ? l.params.max : l.params.kind === 'friends' ? 10 : 0)));
+  const n = Math.min(10, maxSum);
+  const head = [h('th', {}, '+'), ...Array.from({ length: n + 1 }, (_, b) => h('th', {}, b))];
+  const rows = Array.from({ length: n + 1 }, (_, a) => h('tr', {},
+    h('th', {}, a),
+    Array.from({ length: n + 1 }, (_, b) => {
+      if (a + b > n) return h('td', { class: 'out' });
+      if (a === 0 && b === 0) return h('td', { class: 'out' }, '·');
+      const k = keyOf(a, b);
+      if (isMastered(k)) return h('td', { class: 'known', title: `${a} + ${b} = ${a + b}` }, a + b);
+      if (act.missed[k]) return h('td', { class: 'missed', title: 'À retravailler' }, '?');
+      if (act.facts?.[k]?.seen) return h('td', { class: 'learning', title: 'En cours' }, '✨');
+      return h('td', { class: 'unseen' }, '?');
+    })));
+  return h('div', { class: 'grimoire-table-wrap' },
+    h('table', { class: 'grimoire-table' }, h('thead', {}, h('tr', {}, head)), h('tbody', {}, rows)),
+    h('p', { class: 'legend' },
+      h('span', { class: 'lg known' }, '7'), ' je le sais ',
+      h('span', { class: 'lg learning' }, '✨'), ' en cours ',
+      h('span', { class: 'lg missed' }, '?'), ' à retravailler ',
+      h('span', { class: 'lg unseen' }, '?'), ' pas encore vu'));
+}
+
 export default {
   id: 'addition',
   title: 'Potions d’addition',
@@ -191,7 +286,10 @@ export default {
   maxInputLength: 3,
   generate,
   check,
+  levelFacts,
   diagnose,
   speak,
+  renderHint,
   renderHelp,
+  renderGrimoire,
 };

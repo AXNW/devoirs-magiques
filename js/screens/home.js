@@ -3,7 +3,7 @@
 import { h, pick } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
 import { getState, update, activityState, maxPlayableLevel } from '../store.js';
-import { rankInfo, gemProgress } from '../rewards.js';
+import { rankInfo, gemProgress, levelMastery, dailyLimitReached } from '../rewards.js';
 import { ACTIVITIES } from '../activities/registry.js';
 import { FAMILIARS } from '../config.js';
 import { play } from '../sound.js';
@@ -23,7 +23,10 @@ export function render(root, ctx) {
 
   const talk = createTalkingMascot({ size: 150, hatColor: rank.rank.hat });
   const name = s.profile.name.trim();
-  talk.say(`${name ? `Bonjour ${name} ! ` : 'Bonjour ! '}${pick(GREETINGS)}`);
+  const resting = dailyLimitReached(s);
+  talk.say(resting
+    ? 'Les potions se reposent jusqu’à demain 😴 Tu peux regarder ton grimoire et tes familiers !'
+    : `${name ? `Bonjour ${name} ! ` : 'Bonjour ! '}${pick(GREETINGS)}`);
 
   const header = h('header', { class: 'home-header' },
     h('h1', { class: 'title' }, 'L’École des Chats Sorciers'),
@@ -56,7 +59,7 @@ export function render(root, ctx) {
 
   const activities = h('section', { class: 'activities' },
     h('h2', {}, 'Choisis ta potion'),
-    ACTIVITIES.map((activity) => activityCard(activity, s, ctx)),
+    ACTIVITIES.map((activity) => activityCard(activity, s, ctx, resting)),
   );
 
   const footer = h('footer', { class: 'home-footer' },
@@ -75,13 +78,15 @@ export function render(root, ctx) {
   root.append(header, h('div', { class: 'stats' }, rankCard, gemCard, famCard), activities, footer);
 }
 
-function activityCard(activity, s, ctx) {
+function activityCard(activity, s, ctx, resting) {
   // Lecture seule : activityState crée l'entrée si besoin sur une copie.
   const act = s.activities[activity.id] ?? activityState(structuredClone(s), activity);
   const max = maxPlayableLevel(act, activity);
   const visible = activity.levels.filter((l) => l.id <= Math.min(act.ceiling, activity.levels.length));
   const nextNeeded = s.settings.perfectsToUnlock - (act.perfects[act.unlocked] || 0);
   const canUnlockMore = act.unlocked < Math.min(act.ceiling, activity.levels.length);
+  const mastery = canUnlockMore ? levelMastery(act, activity, act.unlocked, s.settings.masteryToUnlock) : null;
+  const perfectsLeft = Math.max(0, nextNeeded);
 
   return h('article', { class: 'card activity' },
     h('div', { class: 'activity-head' },
@@ -89,13 +94,16 @@ function activityCard(activity, s, ctx) {
       h('div', {},
         h('h3', {}, activity.title),
         h('p', { class: 'muted' }, activity.subtitle)),
+      activity.renderGrimoire
+        ? h('button', { class: 'btn btn-soft small grimoire-btn', onClick: () => ctx.navigate(`#/grimoire/${activity.id}`) }, '📖 Mon grimoire')
+        : null,
     ),
     h('div', { class: 'levels' },
       visible.map((lvl) => {
         const open = lvl.id <= max;
         return h('button', {
           class: `level ${open ? '' : 'locked'} ${lvl.id === max ? 'recommended' : ''}`,
-          disabled: !open,
+          disabled: !open || resting,
           onClick: () => ctx.navigate(`#/exercice/${activity.id}/${lvl.id}`),
         },
         h('span', { class: 'level-num' }, open ? `Niveau ${lvl.id}` : '🔒'),
@@ -103,9 +111,15 @@ function activityCard(activity, s, ctx) {
         act.perfects[lvl.id] ? h('span', { class: 'level-hats' }, `🎩 × ${act.perfects[lvl.id]}`) : null);
       }),
     ),
-    canUnlockMore
-      ? h('p', { class: 'muted unlock-hint' }, `✨ Encore ${Math.max(0, nextNeeded)} exercice${nextNeeded > 1 ? 's' : ''} à 3 chapeaux au niveau ${act.unlocked} pour ouvrir le suivant !`)
-      : null,
+    mastery
+      ? h('div', { class: 'unlock-hint' },
+        h('div', { class: 'bar' }, h('div', { class: 'bar-fill', style: { width: `${Math.min(1, mastery.ratio / (s.settings.masteryToUnlock / 100)) * 100}%` } })),
+        h('p', { class: 'muted' }, mastery.needed === 0
+          ? `✨ Niveau ${act.unlocked} : tu connais ${mastery.mastered} calculs sur ${mastery.total} ! Termine une potion pour ouvrir le suivant.`
+          : `✨ Niveau ${act.unlocked} : tu connais ${mastery.mastered} calculs sur ${mastery.total}. Encore ${mastery.needed} à apprendre pour ouvrir le suivant (ou ${perfectsLeft} sans-faute${perfectsLeft > 1 ? 's' : ''}) !`))
+      : canUnlockMore
+        ? h('p', { class: 'muted unlock-hint' }, `✨ Encore ${perfectsLeft} exercice${perfectsLeft > 1 ? 's' : ''} à 3 chapeaux au niveau ${act.unlocked} pour ouvrir le suivant !`)
+        : null,
   );
 }
 

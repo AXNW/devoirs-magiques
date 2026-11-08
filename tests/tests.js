@@ -1,9 +1,9 @@
 // Tests des fonctions pures. Ils tournent dans le navigateur (tests/index.html)
 // ou avec Node : `node tests/tests.js`.
 
-import addition, { buildPool, keyOf, diagnose } from '../js/activities/addition.js';
+import addition, { buildPool, keyOf, diagnose, levelFacts } from '../js/activities/addition.js';
 import { digitFromKeyEvent } from '../js/screens/exercise.js';
-import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon } from '../js/rewards.js';
+import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon, isMastered, levelMastery, dailyLimitReached } from '../js/rewards.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
 
@@ -15,7 +15,7 @@ const eq = (a, b, msg) => assert(a === b, `${msg ?? ''} attendu ${JSON.stringify
 // ---- Additions ----
 
 const levelChecks = {
-  sum: (q, p) => q.answer <= p.max && q.answer >= (p.min ?? 0),
+  sum: (q, p) => q.answer <= p.max && q.answer >= (p.min ?? 0) && q.a <= (p.maxTerm ?? 99) && q.b <= (p.maxTerm ?? 99),
   friends: (q) => q.answer === 10 || q.a === q.b,
   two: (q, p) => q.answer <= 99 && ((q.a % 10) + (q.b % 10) >= 10) === p.carry && q.a >= 10,
 };
@@ -78,8 +78,31 @@ test('keyOf ne dépend pas de l’ordre', () => {
 });
 
 test('retenue : le pool du niveau 9 ne contient que des retenues', () => {
-  assert(buildPool(addition.levels[8].params).every(([a, b]) => (a % 10) + (b % 10) >= 10));
-  assert(buildPool(addition.levels[6].params).every(([a, b]) => (a % 10) + b <= 9 && b <= 9));
+  assert(buildPool(addition.levels[9].params).every(([a, b]) => (a % 10) + (b % 10) >= 10));
+  assert(buildPool(addition.levels[7].params).every(([a, b]) => (a % 10) + b <= 9 && b <= 9));
+});
+
+test('niveau « passer la dizaine » : termes ≤ 9, résultat entre 11 et 18', () => {
+  const pool = buildPool(addition.levels[4].params);
+  assert(pool.length > 0);
+  assert(pool.every(([a, b]) => a <= 9 && b <= 9 && a + b >= 11 && a + b <= 18));
+  eq(levelFacts(addition.levels[4].params).length, 20);
+});
+
+test('levelFacts : calculs uniques par niveau, null pour les grands nombres', () => {
+  eq(levelFacts(addition.levels[1].params).length, 19);
+  eq(levelFacts(addition.levels[8].params), null);
+});
+
+test('génération : priorité aux calculs pas encore sus, avec des révisions', () => {
+  const rng = makeSeededRng(21);
+  const keys = levelFacts(addition.levels[2].params);
+  const notKnown = new Set(keys.filter((k) => !hasZeroKey(k)).slice(0, 5));
+  for (let run = 0; run < 30; run++) {
+    const got = addition.generate(addition.levels[2].params, { rng, isMastered: (k) => !notKnown.has(k) }).map((q) => q.key);
+    for (const k of notKnown) assert(got.includes(k), `${k} (pas su) devrait être proposé`);
+    assert(got.filter((k) => !notKnown.has(k)).length >= 2, 'au moins 2 révisions');
+  }
 });
 
 test('check accepte la bonne réponse uniquement', () => {
@@ -104,6 +127,8 @@ test('clavier : rangée AZERTY sans Maj et pavé numérique', () => {
   eq(digitFromKeyEvent({ code: '', key: '5' }), '5');
   eq(digitFromKeyEvent({ code: 'KeyA', key: 'a' }), null);
 });
+
+const hasZeroKey = (k) => k.startsWith('0+');
 
 // ---- Récompenses ----
 
@@ -182,6 +207,61 @@ test('abandon : étoiles gardées, sans compter pour les gemmes ni les niveaux',
   eq(r.state.activities.addition.missed['2+3'], 1);
 });
 
+test('maîtrise : série de réussites, remise à zéro en cas d’erreur', () => {
+  let s = defaultState();
+  const ok = { level: 1, stars: 10, total: 10, answers: [{ key: '2+3', firstTry: true }] };
+  s = applyExerciseResult(s, ok, addition).state;
+  s = applyExerciseResult(s, ok, addition).state;
+  assert(!isMastered(s.activities.addition, '2+3'));
+  s = applyExerciseResult(s, ok, addition).state;
+  assert(isMastered(s.activities.addition, '2+3'));
+  s = applyExerciseResult(s, { ...ok, answers: [{ key: '2+3', firstTry: false }] }, addition).state;
+  assert(!isMastered(s.activities.addition, '2+3'));
+});
+
+test('déblocage par maîtrise : 80 % des calculs sus suffisent, même sans sans-faute', () => {
+  const s = defaultState();
+  const act = activityState(s, addition);
+  const keys = levelFacts(addition.levels[0].params);
+  const enough = Math.ceil(keys.length * 0.8);
+  keys.slice(0, enough - 1).forEach((k) => { act.facts[k] = { streak: 3, seen: 3 }; });
+  let r = applyExerciseResult(s, { level: 1, stars: 6, total: 10, answers: [] }, addition);
+  eq(r.state.activities.addition.unlocked, 1, 'pas encore assez');
+  eq(levelMastery(r.state.activities.addition, addition, 1).needed, 1);
+  r.state.activities.addition.facts[keys[enough - 1]] = { streak: 3, seen: 3 };
+  r = applyExerciseResult(r.state, { level: 1, stars: 6, total: 10, answers: [] }, addition);
+  eq(r.state.activities.addition.unlocked, 2);
+  eq(r.events.levelUnlocked.id, 2);
+});
+
+test('anti-frustration : 2 exercices difficiles proposent le niveau d’avant', () => {
+  let s = defaultState();
+  activityState(s, addition).unlocked = 3;
+  activityState(s, addition).ceiling = 3;
+  const hard = { level: 3, stars: 2, total: 10, answers: [] };
+  let r = applyExerciseResult(s, hard, addition);
+  eq(r.events.suggestEasier, null);
+  r = applyExerciseResult(r.state, hard, addition);
+  eq(r.events.suggestEasier?.id, 2);
+  r = applyExerciseResult(r.state, { ...hard, stars: 8 }, addition);
+  eq(r.events.suggestEasier, null, 'remis à zéro après un bon exercice');
+  eq(applyExerciseResult(defaultState(), { level: 1, stars: 0, total: 10 }, addition).events.suggestEasier, null);
+});
+
+test('rythme : pause suggérée tous les N exercices, limite du jour', () => {
+  let s = defaultState();
+  s.settings.dailyPauseHint = 2;
+  s.settings.dailyLimit = 3;
+  const ex = { level: 1, stars: 8, total: 10, answers: [] };
+  let r = applyExerciseResult(s, ex, addition);
+  assert(!r.events.pauseHint && !r.events.limitReached);
+  r = applyExerciseResult(r.state, ex, addition);
+  assert(r.events.pauseHint, 'pause au 2e exercice');
+  r = applyExerciseResult(r.state, ex, addition);
+  assert(r.events.limitReached && dailyLimitReached(r.state));
+  assert(!dailyLimitReached(r.state, new Date(Date.now() + 86400000)), 'la limite repart le lendemain');
+});
+
 // ---- Roue ----
 
 test('tirage pondéré : respecte les poids, ignore les poids nuls', () => {
@@ -217,6 +297,22 @@ test('migration : état vide, état partiel, version future', () => {
   let threw = false;
   try { migrate({ version: SCHEMA_VERSION + 1 }); } catch { threw = true; }
   assert(threw, 'une version future doit être refusée');
+});
+
+test('migration v1 → v2 : les niveaux d’addition ≥ 5 sont décalés', () => {
+  const s = migrate({
+    version: 1,
+    activities: { addition: { unlocked: 6, ceiling: 9, perfects: { 2: 1, 5: 2 }, missed: {} } },
+    history: [{ activity: 'addition', level: 7 }, { activity: 'addition', level: 3 }],
+  });
+  eq(s.activities.addition.unlocked, 7);
+  eq(s.activities.addition.ceiling, 10);
+  eq(s.activities.addition.perfects[6], 2);
+  eq(s.activities.addition.perfects[2], 1);
+  eq(s.history[0].level, 8);
+  eq(s.history[1].level, 3);
+  const young = migrate({ version: 1, activities: { addition: { unlocked: 2, ceiling: 2, perfects: {}, missed: {} } } });
+  eq(young.activities.addition.ceiling, 2);
 });
 
 // ---- Lancement ----

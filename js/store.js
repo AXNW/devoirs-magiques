@@ -7,7 +7,7 @@
 import { DEFAULT_SETTINGS, DEFAULT_PRIZES } from './config.js';
 
 export const STORAGE_KEY = 'devoirs-magiques';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function defaultState() {
   return {
@@ -25,7 +25,20 @@ export function defaultState() {
 }
 
 const MIGRATIONS = {
-  // 2: (s) => { s.nouveauChamp = ...; return s; },
+  // v2 : insertion du niveau d'addition « Passer la dizaine » en position 5.
+  2: (s) => {
+    const shift = (n) => (Number(n) >= 5 ? Number(n) + 1 : Number(n));
+    const a = s.activities?.addition;
+    if (a) {
+      a.unlocked = shift(a.unlocked ?? 1);
+      a.ceiling = shift(a.ceiling ?? 2);
+      a.perfects = Object.fromEntries(Object.entries(a.perfects ?? {}).map(([k, v]) => [shift(k), v]));
+    }
+    for (const h of s.history ?? []) {
+      if (h.activity === 'addition') h.level = shift(h.level);
+    }
+    return s;
+  },
 };
 
 function isPlainObject(x) {
@@ -65,7 +78,12 @@ export function activityState(state, activity) {
       missed: {},
     };
   }
-  return state.activities[activity.id];
+  const act = state.activities[activity.id];
+  act.perfects ??= {};
+  act.missed ??= {};
+  act.facts ??= {};      // { '3+4': { streak, seen } }
+  act.lowStreak ??= 0;   // exercices difficiles d'affilée
+  return act;
 }
 
 // Niveau maximum jouable : débloqué ET sous le plafond fixé par le parent.

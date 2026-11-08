@@ -292,3 +292,49 @@ input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--gold); }
 
 .confetti { position: fixed; top: -50px; pointer-events: none; z-index: 40; animation: fall linear forwards; }
 @keyframes fall { to { transform: translateY(110vh) rotate(540deg); opacity: .8; } }
+
+/* ---------- Lot 2 : indices, boîtes de 10, ligne numérique ---------- */
+.hint { margin-top: 10px; padding: 12px; border-radius: 18px; background: rgba(255, 207, 74, .1); border: 2px dashed var(--gold); animation: pop .35s; }
+.hint p { font-size: 1.2rem; }
+
+.tenframes { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 10px 0; }
+.tenframe {
+  display: grid; grid-template-columns: repeat(5, 30px); gap: 4px;
+  padding: 6px; border-radius: 10px; background: rgba(0, 0, 0, .25); border: 2px solid var(--card-border);
+}
+.tenframe .cell { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .2); }
+.tenframe .cell.a { background: var(--violet-light); border-color: #fff; }
+.tenframe .cell.b { background: var(--gold); border-color: #fff; }
+.tenframe .cell.gap { border: 2px dashed var(--gold); animation: glow 1.6s ease-in-out infinite; }
+
+.numline { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; margin: 10px 0; }
+.nl-cell { display: flex; flex-direction: column; align-items: center; width: 34px; }
+.nl-mark { height: 1.6em; font-size: 1.1rem; }
+.nl-num {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border-top: 3px solid var(--muted); font-weight: 600;
+}
+.nl-cell.start .nl-num { background: var(--violet-light); border-radius: 50%; border-top-color: transparent; }
+.nl-cell.hop .nl-num { color: var(--gold); }
+
+/* ---------- Grimoire ---------- */
+.activity-head .grimoire-btn { margin-left: auto; }
+.unlock-hint .bar { margin-bottom: 4px; }
+.grimoire { display: grid; gap: 16px; }
+.grimoire-intro { font-size: 1.15rem; margin-bottom: 12px; text-align: center; }
+.grimoire-table-wrap { overflow-x: auto; }
+.grimoire-table { border-collapse: separate; border-spacing: 4px; margin: 0 auto; font-size: 1.1rem; }
+.grimoire-table th { color: var(--gold); width: 38px; height: 38px; }
+.grimoire-table td { width: 38px; height: 38px; text-align: center; border-radius: 10px; font-weight: 700; }
+.grimoire-table td.known, .legend .known { background: linear-gradient(135deg, var(--gold), #ffe9a8); color: var(--night); box-shadow: 0 0 10px rgba(255, 207, 74, .4); }
+.grimoire-table td.learning, .legend .learning { background: rgba(155, 109, 255, .45); }
+.grimoire-table td.missed, .legend .missed { background: rgba(255, 126, 182, .35); }
+.grimoire-table td.unseen, .legend .unseen { background: rgba(255, 255, 255, .07); color: rgba(255, 255, 255, .35); }
+.grimoire-table td.out { background: none; color: rgba(255, 255, 255, .2); }
+.legend { text-align: center; margin-top: 12px; line-height: 2.2; }
+.legend .lg { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; font-weight: 700; margin-left: 10px; }
+.grimoire-levels { display: grid; gap: 12px; }
+.grimoire-level-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; }
+.grimoire-count { margin-left: auto; font-weight: 700; }
+.grimoire-level.locked { opacity: .55; }
+.mastery-list { margin-top: 6px; color: var(--muted); }

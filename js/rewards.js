@@ -1,7 +1,7 @@
 // Règles de récompense : fonctions pures (aucun accès au DOM ni au stockage),
 // faciles à tester. Elles reçoivent un état et renvoient un nouvel état.
 
-import { RANKS, FAMILIARS } from './config.js';
+import { RANKS, FAMILIARS, MASTERY_STREAK } from './config.js';
 import { activityState } from './store.js';
 import { weightedPick } from './rng.js';
 
@@ -48,9 +48,41 @@ export function unlockFamiliars(s) {
   return added;
 }
 
-// Calculs ratés : reproposés plus souvent, oubliés peu à peu quand ils sont réussis.
-function updateMissed(act, answers) {
+// ---- Maîtrise calcul par calcul ----
+
+export function isMastered(act, key) {
+  return (act.facts?.[key]?.streak ?? 0) >= MASTERY_STREAK;
+}
+
+// { mastered, total, ratio, needed } pour un niveau, ou null si l'activité ne suit pas ce niveau.
+export function levelMastery(act, activity, levelId, threshold = 80) {
+  const level = activity.levels[levelId - 1];
+  const keys = level && activity.levelFacts?.(level.params);
+  if (!keys || !keys.length) return null;
+  const mastered = keys.filter((k) => isMastered(act, k)).length;
+  const needed = Math.max(0, Math.ceil((keys.length * threshold) / 100) - mastered);
+  return { mastered, total: keys.length, ratio: mastered / keys.length, needed };
+}
+
+// ---- Rythme quotidien ----
+
+export function exercisesOn(state, day = new Date()) {
+  const d = day.toDateString();
+  return state.history.filter((x) => new Date(x.date).toDateString() === d).length;
+}
+
+export function dailyLimitReached(state, now = new Date()) {
+  const limit = state.settings.dailyLimit;
+  return limit > 0 && exercisesOn(state, now) >= limit;
+}
+
+// Calculs : série de réussites (maîtrise) et calculs ratés (reproposés plus souvent,
+// oubliés peu à peu quand ils sont réussis).
+function updateFacts(act, answers) {
   for (const a of answers) {
+    const fact = (act.facts[a.key] ??= { streak: 0, seen: 0 });
+    fact.seen += 1;
+    fact.streak = a.firstTry ? Math.min(fact.streak + 1, 99) : 0;
     if (a.firstTry) {
       if (act.missed[a.key]) {
         act.missed[a.key] -= 1;
@@ -80,19 +112,27 @@ export function applyExerciseResult(prev, result, activity, now = new Date()) {
   s.stats.exercisesDone += 1;
   if (hats === 3) s.stats.perfectCount += 1;
 
-  updateMissed(act, answers);
+  updateFacts(act, answers);
 
-  // Déblocage du niveau suivant (jamais au-delà du plafond fixé par le parent).
+  // Déblocage du niveau suivant (jamais au-delà du plafond fixé par le parent) :
+  // assez de calculs sus dans le niveau, OU assez de sans-fautes.
   let levelUnlocked = null;
-  if (hats === 3) {
-    act.perfects[level] = (act.perfects[level] || 0) + 1;
-    const limit = Math.min(act.ceiling, activity.levels.length);
-    if (level === act.unlocked && act.perfects[level] >= settings.perfectsToUnlock && act.unlocked < limit) {
+  if (hats === 3) act.perfects[level] = (act.perfects[level] || 0) + 1;
+  const limit = Math.min(act.ceiling, activity.levels.length);
+  if (act.unlocked < limit) {
+    const byPerfects = (act.perfects[act.unlocked] || 0) >= settings.perfectsToUnlock;
+    const mastery = levelMastery(act, activity, act.unlocked, settings.masteryToUnlock);
+    const byMastery = mastery !== null && mastery.needed === 0;
+    if (byPerfects || byMastery) {
       act.unlocked += 1;
       s.stats.levelUps += 1;
       levelUnlocked = activity.levels[act.unlocked - 1];
     }
   }
+
+  // Anti-frustration : après 2 exercices difficiles d'affilée, proposer le niveau d'avant.
+  act.lowStreak = hats === 0 ? act.lowStreak + 1 : 0;
+  const suggestEasier = level > 1 && act.lowStreak >= 2 ? activity.levels[level - 2] : null;
 
   // Gemmes de lune.
   let gemEarned = false;
@@ -113,7 +153,15 @@ export function applyExerciseResult(prev, result, activity, now = new Date()) {
   const after = rankInfo(s.wallet.totalStars);
   const rankUp = after.index > rankBefore ? after.rank : null;
 
-  return { state: s, events: { hats, success, gemEarned, levelUnlocked, newFamiliars, rankUp } };
+  // Rythme : suggestion de pause, limite du jour.
+  const today = exercisesOn(s, now);
+  const pauseHint = settings.dailyPauseHint > 0 && today % settings.dailyPauseHint === 0;
+  const limitReached = dailyLimitReached(s, now);
+
+  return {
+    state: s,
+    events: { hats, success, gemEarned, levelUnlocked, newFamiliars, rankUp, suggestEasier, today, pauseHint, limitReached },
+  };
 }
 
 // Exercice abandonné en cours de route : on garde les étoiles gagnées et les
@@ -122,7 +170,7 @@ export function applyAbandon(prev, { stars = 0, answers = [] }, activity) {
   const s = structuredClone(prev);
   const rankBefore = rankInfo(s.wallet.totalStars).index;
   s.wallet.totalStars += stars;
-  updateMissed(activityState(s, activity), answers);
+  updateFacts(activityState(s, activity), answers);
   const newFamiliars = unlockFamiliars(s);
   const after = rankInfo(s.wallet.totalStars);
   return { state: s, events: { newFamiliars, rankUp: after.index > rankBefore ? after.rank : null } };

@@ -8,8 +8,14 @@ export const DEFAULT_SETTINGS = {
   successMinHats: 1,        // chapeaux minimum pour qu'un exercice compte comme « réussi »
   exercisesPerGem: 10,      // exercices réussis pour gagner une Gemme de lune
   gemsPerSpin: 1,           // gemmes nécessaires pour tourner la roue
-  perfectsToUnlock: 3,      // exercices à 3 chapeaux pour débloquer le niveau suivant
+  perfectsToUnlock: 3,      // OU : exercices à 3 chapeaux pour débloquer le niveau suivant
+  masteryToUnlock: 80,      // % des calculs du niveau « sus » pour débloquer le suivant
+  dailyPauseHint: 3,        // le chat propose une pause tous les N exercices (0 = jamais)
+  dailyLimit: 0,            // nombre maximum d'exercices par jour (0 = illimité)
 };
+
+// Un calcul est « su » après ce nombre de réussites du premier coup d'affilée.
+export const MASTERY_STREAK = 3;
 
 // Récompenses de la Roue du Destin (modifiables dans l'Espace parent).
 // weight = poids relatif : 2 tombe deux fois plus souvent que 1.

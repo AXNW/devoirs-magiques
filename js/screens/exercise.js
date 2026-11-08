@@ -1,5 +1,6 @@
 // Moteur d'exercice GÉNÉRIQUE : il fonctionne avec n'importe quelle activité
-// qui respecte le contrat (generate / check / renderHelp, et en option diagnose / speak).
+// qui respecte le contrat (generate / check / renderHelp, et en option
+// levelFacts / diagnose / renderHint / speak / renderGrimoire).
 
 import { h, clear, showModal, pick, toast } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
@@ -7,7 +8,7 @@ import { createProgress } from '../ui/progress.js';
 import { createNumpad } from '../ui/numpad.js';
 import { sparkle } from '../ui/confetti.js';
 import { getState, setState, activityState, maxPlayableLevel } from '../store.js';
-import { applyExerciseResult, applyAbandon, starsFor, rankInfo } from '../rewards.js';
+import { applyExerciseResult, applyAbandon, starsFor, rankInfo, isMastered, dailyLimitReached } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
 import { play, speak, canSpeak, stopSpeaking } from '../sound.js';
 
@@ -37,18 +38,24 @@ export function render(root, ctx) {
   if (!activity) { ctx.navigate('#/accueil'); return null; }
 
   const state = getState();
+  if (dailyLimitReached(state)) {
+    toast('Les potions se reposent jusqu’à demain 😴');
+    ctx.navigate('#/accueil');
+    return null;
+  }
   const act = state.activities[activity.id] ?? activityState(structuredClone(state), activity);
   const maxLevel = maxPlayableLevel(act, activity);
   const level = Math.min(Math.max(parseInt(levelParam, 10) || maxLevel, 1), maxLevel);
   const levelDef = activity.levels[level - 1];
   const count = state.settings.questionsPerExercise;
-  const questions = activity.generate(levelDef.params, { count, missed: act.missed });
+  const questions = activity.generate(levelDef.params, { count, missed: act.missed, isMastered: (k) => isMastered(act, k) });
 
   let index = 0;
   let input = '';
   let attempt = 1;
   let stars = 0;
   let combo = 0;
+  let hardInARow = 0; // calculs ratés deux fois d'affilée
   let mode = 'answer'; // answer | retype | wait | done
   const answers = [];
   const timers = [];
@@ -143,6 +150,7 @@ export function render(root, ctx) {
       const gained = starsFor(attempt);
       stars += gained;
       combo += 1;
+      hardInARow = 0;
       answers.push({ key: q.key, firstTry: attempt === 1 });
       progress.set(index, attempt === 1 ? 'star' : 'half');
       progress.combo(combo >= 3);
@@ -169,11 +177,14 @@ export function render(root, ctx) {
       feedbackEl.className = 'feedback retry';
       feedbackEl.textContent = hint ?? pick(RETRY);
       talk.say(hint ? 'Essaie encore, tu y es presque 🐾' : 'Prends ton temps, tu peux compter sur tes doigts 🐾');
+      const visual = activity.renderHint?.(q);
+      if (visual) clear(helpEl).append(visual);
       return;
     }
 
     // Deuxième erreur : on montre comment faire, puis l'enfant recopie la réponse.
     combo = 0;
+    hardInARow += 1;
     progress.combo(false);
     answers.push({ key: q.key, firstTry: false });
     progress.set(index, 'miss');
@@ -183,7 +194,9 @@ export function render(root, ctx) {
     questionEl.classList.add('retype');
     feedbackEl.className = 'feedback retry';
     feedbackEl.textContent = 'Regarde, on le fait ensemble 👇 puis écris la réponse.';
-    talk.say('Ce n’est pas grave, c’est comme ça qu’on apprend !');
+    talk.say(hardInARow >= 2
+      ? 'Respire un grand coup 🌬️ On apprend ensemble, tu vas y arriver !'
+      : 'Ce n’est pas grave, c’est comme ça qu’on apprend !');
     clear(helpEl).append(activity.renderHelp(q));
   }
 
