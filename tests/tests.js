@@ -1,8 +1,9 @@
 // Tests des fonctions pures. Ils tournent dans le navigateur (tests/index.html)
 // ou avec Node : `node tests/tests.js`.
 
-import addition, { buildPool, keyOf } from '../js/activities/addition.js';
-import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin } from '../js/rewards.js';
+import addition, { buildPool, keyOf, diagnose } from '../js/activities/addition.js';
+import { digitFromKeyEvent } from '../js/screens/exercise.js';
+import { hatsFor, starsFor, rankInfo, applyExerciseResult, applySpin, applyAbandon } from '../js/rewards.js';
 import { defaultState, migrate, activityState, maxPlayableLevel, SCHEMA_VERSION } from '../js/store.js';
 import { makeSeededRng, weightedPick } from '../js/rng.js';
 
@@ -88,6 +89,22 @@ test('check accepte la bonne réponse uniquement', () => {
   assert(!addition.check(q, ''));
 });
 
+test('messages ciblés : nombre de départ recompté, pas de trop, chiffres inversés', () => {
+  assert(diagnose({ a: 6, b: 2, answer: 8 }, '7').includes('pars de 6'), 'oubli du surcomptage');
+  assert(diagnose({ a: 6, b: 2, answer: 8 }, '9').includes('pas de trop'));
+  assert(diagnose({ a: 9, b: 4, answer: 13 }, '31').includes('désordre'));
+  eq(diagnose({ a: 6, b: 2, answer: 8 }, '3'), null);
+  eq(diagnose({ a: 34, b: 5, answer: 39 }, '38'), 'Tout près ! Vérifie bien les unités.');
+});
+
+test('clavier : rangée AZERTY sans Maj et pavé numérique', () => {
+  eq(digitFromKeyEvent({ code: 'Digit7', key: 'è' }), '7');
+  eq(digitFromKeyEvent({ code: 'Digit0', key: 'à' }), '0');
+  eq(digitFromKeyEvent({ code: 'Numpad3', key: 'PageDown' }), '3');
+  eq(digitFromKeyEvent({ code: '', key: '5' }), '5');
+  eq(digitFromKeyEvent({ code: 'KeyA', key: 'a' }), null);
+});
+
 // ---- Récompenses ----
 
 test('étoiles et chapeaux', () => {
@@ -154,6 +171,15 @@ test('l’état d’origine n’est pas modifié', () => {
   const s = defaultState();
   applyExerciseResult(s, { level: 1, stars: 10, total: 10, answers: [] }, addition);
   eq(s.stats.exercisesDone, 0);
+});
+
+test('abandon : étoiles gardées, sans compter pour les gemmes ni les niveaux', () => {
+  const s = defaultState();
+  const r = applyAbandon(s, { stars: 4.5, answers: [{ key: '2+3', firstTry: false }] }, addition);
+  eq(r.state.wallet.totalStars, 4.5);
+  eq(r.state.stats.exercisesDone, 0);
+  eq(r.state.wallet.successSinceLastGem, 0);
+  eq(r.state.activities.addition.missed['2+3'], 1);
 });
 
 // ---- Roue ----

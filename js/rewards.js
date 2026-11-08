@@ -48,6 +48,20 @@ export function unlockFamiliars(s) {
   return added;
 }
 
+// Calculs ratés : reproposés plus souvent, oubliés peu à peu quand ils sont réussis.
+function updateMissed(act, answers) {
+  for (const a of answers) {
+    if (a.firstTry) {
+      if (act.missed[a.key]) {
+        act.missed[a.key] -= 1;
+        if (act.missed[a.key] <= 0) delete act.missed[a.key];
+      }
+    } else {
+      act.missed[a.key] = (act.missed[a.key] || 0) + 1;
+    }
+  }
+}
+
 /**
  * Enregistre la fin d'un exercice.
  * result = { level, stars, total, answers: [{ key, firstTry }] }
@@ -66,17 +80,7 @@ export function applyExerciseResult(prev, result, activity, now = new Date()) {
   s.stats.exercisesDone += 1;
   if (hats === 3) s.stats.perfectCount += 1;
 
-  // Calculs ratés : reproposés plus souvent, oubliés peu à peu quand ils sont réussis.
-  for (const a of answers) {
-    if (a.firstTry) {
-      if (act.missed[a.key]) {
-        act.missed[a.key] -= 1;
-        if (act.missed[a.key] <= 0) delete act.missed[a.key];
-      }
-    } else {
-      act.missed[a.key] = (act.missed[a.key] || 0) + 1;
-    }
-  }
+  updateMissed(act, answers);
 
   // Déblocage du niveau suivant (jamais au-delà du plafond fixé par le parent).
   let levelUnlocked = null;
@@ -110,6 +114,18 @@ export function applyExerciseResult(prev, result, activity, now = new Date()) {
   const rankUp = after.index > rankBefore ? after.rank : null;
 
   return { state: s, events: { hats, success, gemEarned, levelUnlocked, newFamiliars, rankUp } };
+}
+
+// Exercice abandonné en cours de route : on garde les étoiles gagnées et les
+// calculs à retravailler, mais l'exercice ne compte ni pour les gemmes ni pour les niveaux.
+export function applyAbandon(prev, { stars = 0, answers = [] }, activity) {
+  const s = structuredClone(prev);
+  const rankBefore = rankInfo(s.wallet.totalStars).index;
+  s.wallet.totalStars += stars;
+  updateMissed(activityState(s, activity), answers);
+  const newFamiliars = unlockFamiliars(s);
+  const after = rankInfo(s.wallet.totalStars);
+  return { state: s, events: { newFamiliars, rankUp: after.index > rankBefore ? after.rank : null } };
 }
 
 // Fait tourner la roue. Renvoie null si pas assez de gemmes ou aucune récompense.

@@ -12,7 +12,7 @@ const GREETINGS = [
   'On fait un peu de magie ?',
   'Mes moustaches frétillent : c’est l’heure des potions !',
   'Choisis une potion, je t’attends !',
-  'Miaou ! Prêt pour un nouveau sortilège ?',
+  'Miaou ! Un nouveau sortilège aujourd’hui ?',
 ];
 
 export function render(root, ctx) {

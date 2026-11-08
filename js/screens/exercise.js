@@ -1,18 +1,35 @@
 // Moteur d'exercice GÉNÉRIQUE : il fonctionne avec n'importe quelle activité
-// qui respecte le contrat (generate / check / renderHelp).
+// qui respecte le contrat (generate / check / renderHelp, et en option diagnose / speak).
 
-import { h, clear, showModal, pick } from '../ui/dom.js';
+import { h, clear, showModal, pick, toast } from '../ui/dom.js';
 import { createTalkingMascot } from '../ui/mascot.js';
 import { createProgress } from '../ui/progress.js';
 import { createNumpad } from '../ui/numpad.js';
 import { sparkle } from '../ui/confetti.js';
 import { getState, setState, activityState, maxPlayableLevel } from '../store.js';
-import { applyExerciseResult, starsFor, rankInfo } from '../rewards.js';
+import { applyExerciseResult, applyAbandon, starsFor, rankInfo } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
-import { play } from '../sound.js';
+import { play, speak, canSpeak, stopSpeaking } from '../sound.js';
 
-const PRAISE = ['Miaou-gique !', 'Bravo !', 'Super sortilège !', 'Abracadabra, c’est juste !', 'Tu es un vrai sorcier !', 'Ronron de fierté !', 'Parfait !'];
-const RETRY = ['Presque ! Essaie encore 💪', 'Oups, la potion a fait pschitt… Réessaie !', 'Pas tout à fait. Recompte bien !'];
+// Féliciter l'effort et la méthode plutôt qu'un « talent ».
+const PRAISE = [
+  'Miaou-gique !',
+  'Bravo, tu as bien compté !',
+  'Abracadabra, c’est juste !',
+  'Bien joué !',
+  'Ronron de fierté !',
+  'Tu as pris ton temps, bravo !',
+  'Ça, c’est de l’entraînement !',
+];
+const RETRY = ['Presque ! Essaie encore 💪', 'Pas tout à fait. Recompte doucement !', 'Oups, la potion a fait pschitt… Réessaie !'];
+
+// Touche physique → chiffre. Fonctionne en AZERTY sans Maj (rangée du haut)
+// et sur le pavé numérique.
+export function digitFromKeyEvent(e) {
+  const m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code || '');
+  if (m) return m[1];
+  return /^[0-9]$/.test(e.key) ? e.key : null;
+}
 
 export function render(root, ctx) {
   const [activityId, levelParam] = ctx.params;
@@ -42,6 +59,12 @@ export function render(root, ctx) {
   const talk = createTalkingMascot({ size: 110, hatColor: rankInfo(state.wallet.totalStars).rank.hat });
   const promptEl = h('span', { class: 'q-prompt' });
   const answerEl = h('span', { class: 'q-answer', 'aria-live': 'polite' });
+  const listenBtn = canSpeak()
+    ? h('button', {
+      class: 'speak-btn q-speak', type: 'button', 'aria-label': 'Écouter le calcul',
+      onClick: (e) => { e.currentTarget.blur(); const q = questions[index]; speak(activity.speak?.(q) ?? q.prompt); },
+    }, '🔊')
+    : null;
   const questionEl = h('div', { class: 'question' }, promptEl, h('span', { class: 'q-eq' }, '='), answerEl);
   const feedbackEl = h('div', { class: 'feedback', 'aria-live': 'polite' });
   const helpEl = h('div', { class: 'help-zone' });
@@ -58,7 +81,7 @@ export function render(root, ctx) {
     progress.el,
     h('div', { class: 'exercise' },
       h('div', { class: 'exercise-left' }, talk.el),
-      h('div', { class: 'exercise-main card' }, questionEl, feedbackEl, helpEl),
+      h('div', { class: 'exercise-main card' }, listenBtn, questionEl, feedbackEl, helpEl),
       h('div', { class: 'exercise-pad' }, numpad),
     ),
   );
@@ -76,7 +99,7 @@ export function render(root, ctx) {
     progress.current(index);
     topBar.querySelector('.topbar-count').textContent = `${index + 1} / ${count}`;
     renderInput();
-    if (index === 0) talk.say('Écris le résultat puis appuie sur Entrée ✔');
+    if (index === 0) talk.say('Écris le résultat, puis appuie sur Entrée ✔');
   }
 
   function renderInput() {
@@ -98,10 +121,11 @@ export function render(root, ctx) {
     renderInput();
   }
 
-  function shake() {
-    questionEl.classList.remove('shake');
+  // Petit balancement doux (pas de secousse brutale).
+  function wobble() {
+    questionEl.classList.remove('wobble');
     void questionEl.offsetWidth;
-    questionEl.classList.add('shake');
+    questionEl.classList.add('wobble');
   }
 
   function submit() {
@@ -111,7 +135,7 @@ export function render(root, ctx) {
 
     if (mode === 'retype') {
       if (ok) { play('correct'); next(); }
-      else { play('oops'); shake(); input = ''; renderInput(); }
+      else { play('oops'); wobble(); input = ''; renderInput(); }
       return;
     }
 
@@ -125,7 +149,7 @@ export function render(root, ctx) {
       questionEl.classList.add('correct');
       feedbackEl.className = 'feedback good';
       feedbackEl.textContent = attempt === 1 ? `${pick(PRAISE)} +1 ⭐` : 'Bien rattrapé ! +½ ⭐';
-      talk.say(combo >= 3 ? `Combo × ${combo} ! La boule de cristal brille 🔮` : pick(PRAISE));
+      talk.say(combo >= 3 ? `${combo} bonnes réponses d’affilée ! La boule de cristal brille 🔮` : pick(PRAISE));
       talk.mood('happy');
       play('correct', { combo });
       sparkle(answerEl, combo >= 3 ? 22 : 12);
@@ -135,15 +159,16 @@ export function render(root, ctx) {
     }
 
     play('oops');
-    shake();
+    wobble();
     talk.mood('oops');
     if (attempt === 1) {
+      const hint = activity.diagnose?.(q, input);
       attempt = 2;
       input = '';
       renderInput();
       feedbackEl.className = 'feedback retry';
-      feedbackEl.textContent = pick(RETRY);
-      talk.say('Prends ton temps, tu peux compter sur tes doigts 🐾');
+      feedbackEl.textContent = hint ?? pick(RETRY);
+      talk.say(hint ? 'Essaie encore, tu y es presque 🐾' : 'Prends ton temps, tu peux compter sur tes doigts 🐾');
       return;
     }
 
@@ -176,21 +201,35 @@ export function render(root, ctx) {
     ctx.navigate('#/resultats');
   }
 
+  function quit() {
+    mode = 'done';
+    if (stars > 0 || answers.length) {
+      const { state: newState } = applyAbandon(getState(), { stars, answers }, activity);
+      setState(newState);
+      if (stars > 0) toast(`Tes ${String(stars).replace('.', ',')} ⭐ sont gardées !`);
+    }
+    ctx.navigate('#/accueil');
+  }
+
   function askQuit() {
     if (index === 0 && attempt === 1 && mode === 'answer') { ctx.navigate('#/accueil'); return; }
     showModal(
-      h('div', {}, h('p', { class: 'modal-title' }, 'Tu veux arrêter la potion ?'), h('p', { class: 'muted' }, 'Les étoiles de cet exercice ne seront pas gardées.')),
+      h('div', {},
+        h('p', { class: 'modal-title' }, 'Tu veux faire une pause ?'),
+        h('p', { class: 'muted' }, 'Tes étoiles sont gardées. Pour remplir le compteur de gemmes, il faudra finir une potion entière.')),
       [
-        { label: 'Non, je continue', class: 'btn' },
-        { label: 'Oui, arrêter', class: 'btn btn-soft', onClick: () => ctx.navigate('#/accueil') },
+        { label: 'Je continue', class: 'btn' },
+        { label: 'Pause', class: 'btn btn-soft', onClick: quit },
       ],
     );
   }
 
   function onKey(e) {
     if (document.querySelector('.modal-overlay')) return;
-    if (/^[0-9]$/.test(e.key)) { addDigit(e.key); e.preventDefault(); }
-    else if (e.key === 'Backspace') { removeDigit(); e.preventDefault(); }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const digit = digitFromKeyEvent(e);
+    if (digit !== null) { addDigit(digit); e.preventDefault(); }
+    else if (e.key === 'Backspace' || e.key === 'Delete') { removeDigit(); e.preventDefault(); }
     else if (e.key === 'Enter') { submit(); e.preventDefault(); }
   }
 
@@ -200,6 +239,7 @@ export function render(root, ctx) {
   return () => {
     document.removeEventListener('keydown', onKey);
     timers.forEach(clearTimeout);
+    stopSpeaking();
     document.querySelector('.modal-overlay')?.remove();
   };
 }

@@ -127,6 +127,28 @@ export function check(question, input) {
   return input !== '' && Number(input) === question.answer;
 }
 
+// Message adapté à une erreur fréquente (ou null si rien de particulier).
+export function diagnose(q, input) {
+  const n = Number(input);
+  const answer = String(q.answer);
+  if (answer.length === 2 && answer[0] !== answer[1] && input === answer[1] + answer[0]) {
+    return 'Les bons chiffres, mais dans le désordre ! Lequel vient en premier ?';
+  }
+  const big = Math.max(q.a, q.b);
+  const small = Math.min(q.a, q.b);
+  if (q.answer <= 20 && small > 0 && n === q.answer - 1) {
+    return `Tout près ! On ne recompte pas le ${big} : pars de ${big} et avance de ${small}.`;
+  }
+  if (q.answer <= 20 && n === q.answer + 1) return 'Tout près ! Tu as fait un pas de trop, recompte doucement.';
+  if (q.answer > 20 && Math.abs(n - q.answer) === 1) return 'Tout près ! Vérifie bien les unités.';
+  return null;
+}
+
+// Phrase lue à voix haute par le bouton 🔊.
+export function speak(q) {
+  return `Combien font ${q.a} plus ${q.b} ?`;
+}
+
 // Aide visuelle après deux erreurs.
 export function renderHelp(q) {
   if (q.a <= 10 && q.b <= 10) {
@@ -169,5 +191,7 @@ export default {
   maxInputLength: 3,
   generate,
   check,
+  diagnose,
+  speak,
   renderHelp,
 };

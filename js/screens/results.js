@@ -8,11 +8,12 @@ import { gemProgress, rankInfo } from '../rewards.js';
 import { getActivity } from '../activities/registry.js';
 import { play } from '../sound.js';
 
+// Valoriser l'effort et les progrès, quel que soit le résultat.
 const MESSAGES = [
-  'Ce n’est pas grave, on va s’entraîner encore un peu ensemble !',
+  'Bravo, la potion est terminée ! On s’entraîne encore un peu ?',
   'Bien joué, tu progresses !',
-  'Très bien ! Tu y es presque !',
-  'Incroyable ! Un sans-faute magique !',
+  'Très bien ! Ton entraînement paie !',
+  'Un sans-faute ! Tout ce travail a payé !',
 ];
 
 export function render(root, ctx) {
@@ -46,7 +47,7 @@ export function render(root, ctx) {
         ? h('div', { class: 'gem-progress' },
           h('div', { class: 'bar' }, h('div', { class: 'bar-fill gem', style: { width: `${(gem.done / gem.needed) * 100}%` } })),
           h('p', { class: 'muted' }, r.gemEarned ? 'Le compteur repart pour une nouvelle gemme !' : `💎 ${gem.done} / ${gem.needed} exercices réussis avant ta prochaine Gemme de lune`))
-        : h('p', { class: 'muted' }, `Il faut au moins ${s.settings.successMinHats} chapeau${s.settings.successMinHats > 1 ? 'x' : ''} pour remplir le compteur de gemmes. Tu peux réessayer !`),
+        : h('p', { class: 'muted' }, `Cette fois, le compteur de gemmes n’avance pas (il faut ${s.settings.successMinHats} chapeau${s.settings.successMinHats > 1 ? 'x' : ''}). Avec un peu d’entraînement, ça va venir !`),
       news,
       h('div', { class: 'actions' },
         h('button', { class: 'btn', onClick: () => ctx.navigate(`#/exercice/${r.activityId}/${r.level}`) }, '🔁 Rejouer'),

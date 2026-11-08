@@ -43,9 +43,9 @@ export function play(name, { combo = 0 } = {}) {
     case 'correct':
       [NOTES.E5, NOTES.G5, NOTES.C6].forEach((f, i) => tone(c, f * up, t + i * 0.08, 0.25, { type: 'triangle' }));
       break;
-    case 'oops':
-      tone(c, 392, t, 0.18, { type: 'sine', gain: 0.08 });
-      tone(c, 330, t + 0.15, 0.25, { type: 'sine', gain: 0.08 });
+    case 'oops': // son neutre et doux (pas de « buzzer » d'échec)
+      tone(c, 440, t, 0.15, { type: 'sine', gain: 0.06 });
+      tone(c, 494, t + 0.13, 0.2, { type: 'sine', gain: 0.06 });
       break;
     case 'win':
       [NOTES.C5, NOTES.E5, NOTES.G5, NOTES.C6, NOTES.E6, NOTES.G6].forEach((f, i) =>
@@ -61,4 +61,38 @@ export function play(name, { combo = 0 } = {}) {
     default:
       break;
   }
+}
+
+// ---- Lecture à voix haute (synthèse vocale du navigateur) -----------------
+
+export function canSpeak() {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+function frenchVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find((v) => /^fr(-|_)FR/i.test(v.lang)) ?? voices.find((v) => /^fr/i.test(v.lang)) ?? null;
+}
+
+// Toujours déclenchée par un clic de l'enfant : elle fonctionne même si les sons sont coupés.
+export function speak(text) {
+  if (!canSpeak() || !text) return;
+  const clean = text
+    .replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, '')
+    .replace(/\+/g, ' plus ')
+    .replace(/×/g, ' fois ')
+    .replace(/=/g, ' égale ')
+    .replace(/½/g, ' une demie ');
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = 'fr-FR';
+  u.rate = 0.9;
+  u.pitch = 1.1;
+  const voice = frenchVoice();
+  if (voice) u.voice = voice;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+export function stopSpeaking() {
+  if (canSpeak()) window.speechSynthesis.cancel();
 }

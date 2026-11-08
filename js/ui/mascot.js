@@ -1,6 +1,7 @@
 // Le chat sorcier « Moustache » en SVG. Humeurs : idle, happy, oops.
 
 import { h } from './dom.js';
+import { canSpeak, speak } from '../sound.js';
 
 const SVG = `
 <svg viewBox="0 0 220 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -63,16 +64,21 @@ export function setMood(el, mood, duration = 1200) {
   }
 }
 
-// Mascotte + bulle de parole.
+// Mascotte + bulle de parole, avec un bouton 🔊 pour l'entendre.
 export function createTalkingMascot(opts) {
   const mascot = createMascot(opts);
-  const bubble = h('div', { class: 'bubble' });
+  const text = h('span', { class: 'bubble-text' });
+  const speakBtn = canSpeak()
+    ? h('button', { class: 'speak-btn', type: 'button', 'aria-label': 'Écouter', onClick: (e) => { e.currentTarget.blur(); speak(text.textContent); } }, '🔊')
+    : null;
+  const bubble = h('div', { class: 'bubble hidden' }, text, speakBtn);
   const el = h('div', { class: 'talking-mascot' }, mascot, bubble);
   return {
     el,
     mascot,
-    say(text) {
-      bubble.textContent = text;
+    say(message) {
+      text.textContent = message;
+      bubble.classList.toggle('hidden', !message);
       bubble.classList.remove('pop');
       void bubble.offsetWidth; // relance l'animation
       bubble.classList.add('pop');
